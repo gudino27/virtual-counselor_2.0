@@ -9,12 +9,12 @@ function Navbar({ activeTab, setActiveTab }) {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 bg-[#981e32] text-white shadow-lg navbar-fixed transition-all duration-300">
+    <nav className="sticky top-0 z-60 bg-[#981e32] text-white shadow-lg navbar-fixed transition-all duration-300">
       <div className="container-custom">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-22">
           {/* Logo Section */}
           <div className="flex items-center space-x-3">
-             <img src="/src/assets/logo.png" alt="VC Logo" className="w-10 h-10 rounded-lg shadow-sm border border-white/20" />
+             <img src="/src/logo-1024.png" alt="VC Logo" className="w-20 h-20 rounded-lg shadow-sm " />
             <div>
               <h1 className="text-lg md:text-xl font-bold leading-tight">Virtual Counselor</h1>
               <p className="text-[10px] md:text-xs text-red-100 font-medium tracking-wide uppercase">Washington State University</p>
