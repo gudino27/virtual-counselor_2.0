@@ -497,10 +497,10 @@ function CourseCard({ courseKey, course, sections, isExpanded, onToggle, onAdd, 
   const isAdded = (section) => selectedCourses.some(c => c.uniqueId === section.uniqueId);
 
   return (
-    <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full px-4 py-3 text-left hover:bg-gray-100 transition flex items-center justify-between"
+        className="w-full px-3 py-3 text-left hover:bg-gray-100 transition flex items-center justify-between"
       >
         <div className="flex-1">
           <div className="font-semibold text-gray-900">
@@ -656,6 +656,21 @@ function WeeklyCalendar({ courses, courseColors, onCourseClick }) {
     return events;
   }, [courses, courseColors]);
 
+  // Use compact calendar layout for screens up to 1024px (mobile + tablet)
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const m = window.matchMedia && window.matchMedia('(max-width: 1024px)');
+    const update = () => setIsCompact(!!(m ? m.matches : window.innerWidth <= 1024));
+    update();
+    if (m && m.addEventListener) m.addEventListener('change', update);
+    else if (m && m.addListener) m.addListener(update);
+    return () => {
+      if (m && m.removeEventListener) m.removeEventListener('change', update);
+      else if (m && m.removeListener) m.removeListener(update);
+    };
+  }, []);
+
   const formatHour = (h) => {
     if (h === 0) return '12 AM';
     if (h < 12) return `${h} AM`;
@@ -663,6 +678,92 @@ function WeeklyCalendar({ courses, courseColors, onCourseClick }) {
     return `${h - 12} PM`;
   };
 
+  // Compact view for smaller screens (mobile/tablet): compact calendar grid
+  if (isCompact) {
+    // Compact calendar grid for mobile: slightly larger blocks so location fits,
+    // and smaller prefix text so long prefixes don't overflow.
+    const hourHeight = 80; // px per hour (slightly larger for readability)
+    const blockHeight = hourHeight / 4; // 15-minute block
+
+    return (
+      <div className="overflow-x-auto w-full">
+        <div className="min-w-[425px]">
+          {/* Header */}
+          <div className="grid grid-cols-[50px_repeat(5,1fr)] border-b border-gray-300 bg-gray-50 sticky top-0 z-10">
+            <div className="p-2 text-xs font-medium text-gray-500 border-r border-gray-200"></div>
+            {days.map(day => (
+              <div key={day} className="p-2 text-sm font-semibold text-gray-700 text-center border-r border-gray-200 last:border-r-0">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Time grid */}
+          <div className="relative">
+            {hours.map(hour => (
+              <div key={hour} className="grid grid-cols-[50px_repeat(5,1fr)] border-b border-gray-200" style={{ height: `${hourHeight}px`,  border: '0.2px solid rgba(0, 0, 0, 0.12)' }}>
+                <div className="p-1 text-xs text-gray-500 border-r border-gray-200 flex items-start justify-end pr-2 pt-0">
+                  {formatHour(hour)}
+                </div>
+                {days.map((day, idx) => (
+                  <div key={day} className="border-r border-gray-300 last:border-r-0 relative" style={{border:'0.2px solid rgba(0, 0, 0, 0.12)'}}>
+                    <div className="absolute w-full h-1/4 border-b border-gray-300"></div>
+                    <div className="absolute w-full h-2/4 border-b border-gray-300"></div>
+                    <div className="absolute w-full h-3/4 border-b border-gray-300"></div>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {/* Course blocks overlay */}
+            <div className="absolute top-0 left-[50px] right-0 bottom-0">
+              <div className="relative h-full grid grid-cols-5">
+                {days.map((_, dayIndex) => (
+                  <div key={dayIndex} className="relative">
+                    {calendarEvents
+                      .filter(e => e.dayIndex === dayIndex)
+                      .map((event, idx) => {
+                        // Recompute scaled positions for smaller hourHeight
+                        const scaledTop = (event.topOffset / 48) * hourHeight;
+                        const scaledHeight = (event.height / 48) * hourHeight;
+                        const subject = (event.course.prefix || event.course.coursePrefix || '').toString();
+                        const number = (event.course.courseNumber || '').toString();
+                        const secondaryColor = event.textColor === '#fff' ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.85)';
+                        return (
+                          <div
+                            key={`${event.course.uniqueId}-${dayIndex}-${idx}`}
+                            className={`absolute left-1 right-1 rounded-md shadow-sm cursor-pointer hover:opacity-95 transition-opacity overflow-hidden`}
+                            style={{
+                              top: `${scaledTop}px`,
+                              height: `${Math.max(scaledHeight, 52)}px`,
+                              background: event.colorValue,
+                              color: event.textColor,
+                              padding: '6px'
+                            }}
+                            onClick={() => onCourseClick(event.course)}
+                            title={`${subject} ${number} — ${event.timeDisplay}${event.course.location ? ' — ' + event.course.location : ''}`}
+                          >
+                            <div className="flex flex-col h-full">
+                              <div className="text-[11px] font-semibold leading-snug whitespace-normal" style={{ color: event.textColor }}>{subject} {number}</div>
+                              <div className="text-[11px] leading-tight whitespace-normal" style={{ color: secondaryColor }}>{event.timeDisplay}</div>
+                              {event.course.location && event.course.location !== 'ARR ARR' && (
+                                <div className="text-[11px]" style={{ color: secondaryColor }}>{event.course.location}</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop grid view (unchanged)
   return (
     <div className="relative min-w-[600px]">
       {/* Header */}
@@ -684,11 +785,11 @@ function WeeklyCalendar({ courses, courseColors, onCourseClick }) {
               {formatHour(hour)}
             </div>
             {days.map((day, idx) => (
-              <div key={day} className="border-r border-gray-100 last:border-r-0 relative">
+              <div key={day} className="border-r border-gray-300 last:border-r-0 relative">
                 {/* 15-minute lines */}
-                <div className="absolute w-full h-1/4 border-b border-gray-100"></div>
-                <div className="absolute w-full h-2/4 border-b border-gray-100"></div>
-                <div className="absolute w-full h-3/4 border-b border-gray-100"></div>
+                <div className="absolute w-full h-1/4 border-b border-gray-300"></div>
+                <div className="absolute w-full h-2/4 border-b border-gray-300"></div>
+                <div className="absolute w-full h-3/4 border-b border-gray-300"></div>
               </div>
             ))}
           </div>

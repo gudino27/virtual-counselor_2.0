@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ClassGradeCalculator from './ClassGradeCalculator';
 import ExcelJS from 'exceljs';
 import { fetchDegrees, fetchDegreeRequirements, searchCourses } from '../utils/api';
 import { detectElectiveKinds, buildElectiveFilter, computeUcoreSatisfaction } from '../utils/courseHelpers';
@@ -24,6 +25,7 @@ function DegreePlanner() {
     { id: 4, name: 'Year 4' }
   ]);
   const [activeYearTab, setActiveYearTab] = useState(1);
+  const [activeTermTab, setActiveTermTab] = useState('fall'); // 'fall', 'spring', 'summer'
   
   const [degreePlan, setDegreePlan] = useState({});
   const [showGradeScale, setShowGradeScale] = useState(false);
@@ -31,6 +33,8 @@ function DegreePlanner() {
   const [optimizeSpeed, setOptimizeSpeed] = useState('normal');
   const degreeInputRef = useRef(null);
   const [showCatalogModal, setShowCatalogModal] = useState(false);
+  const [showClassCalc, setShowClassCalc] = useState(false);
+  const [classCalcCourseName, setClassCalcCourseName] = useState(null);
   const [catalogSearch, setCatalogSearch] = useState('');
   const [catalogResults, setCatalogResults] = useState([]);
   const [catalogModalYear, setCatalogModalYear] = useState('');
@@ -73,9 +77,9 @@ function DegreePlanner() {
     const plan = {};
     years.forEach(year => {
       plan[year.id] = {
-        fall: { courses: [{ id: Date.now(), name: '', credits: 0, grade: '', status: 'not-taken' }] },
-        spring: { courses: [{ id: Date.now() + 1, name: '', credits: 0, grade: '', status: 'not-taken' }] },
-        summer: { courses: [{ id: Date.now() + 2, name: '', credits: 0, grade: '', status: 'not-taken' }] }
+        fall: { courses: [] },
+        spring: { courses: [] },
+        summer: { courses: [] }
       };
     });
     setDegreePlan(plan);
@@ -355,9 +359,9 @@ function DegreePlanner() {
     setDegreePlan(prev => ({
       ...prev,
       [newId]: {
-        fall: { courses: [{ id: Date.now(), name: '', credits: 0, grade: '', status: 'not-taken' }] },
-        spring: { courses: [{ id: Date.now() + 1, name: '', credits: 0, grade: '', status: 'not-taken' }] },
-        summer: { courses: [{ id: Date.now() + 2, name: '', credits: 0, grade: '', status: 'not-taken' }] }
+        fall: { courses: [] },
+        spring: { courses: [] },
+        summer: { courses: [] }
       }
     }));
   };
@@ -415,13 +419,26 @@ function DegreePlanner() {
                 return p;
               })();
 
+          // Clear existing empty slots in the target year before populating
+          const newPlan = JSON.parse(JSON.stringify(prev));
           data.schedule.forEach(semester => {
-            semester.year = parseInt(semester.year, 10);
-            semester.term = parseInt(semester.term, 10);
-            const yearId = semester.year;
-            const term = termMap[semester.term];
-            console.log('Applying semester to plan:', yearId, term, semester.courses && semester.courses.length);
+             const yearId = parseInt(semester.year, 10);
+             const term = termMap[parseInt(semester.term, 10)];
+             
+             if (newPlan[yearId] && newPlan[yearId][term]) {
+                // remove any course with empty name (placeholder)
+                newPlan[yearId][term].courses = newPlan[yearId][term].courses.filter(c => c.name && c.name.trim() !== '');
+                // Also update the base reference so subsequent additions use the clean list
+                if (base[yearId] && base[yearId][term]) {
+                   base[yearId][term].courses = newPlan[yearId][term].courses;
+                }
+             }
+          });
 
+          // Now populate
+          data.schedule.forEach(semester => {
+            const yearId = parseInt(semester.year, 10);
+            const term = termMap[parseInt(semester.term, 10)];            
             if (!base[yearId]) {
               base[yearId] = { fall: { courses: [] }, spring: { courses: [] }, summer: { courses: [] } };
             }
@@ -2096,79 +2113,132 @@ function DegreePlanner() {
     setCatalogIndex(0);
   }, [catalogUcoreSelected, catalogClientSearch]);
 
+  // Close grade scale modal on Escape key
+  useEffect(() => {
+    if (!showGradeScale) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowGradeScale(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showGradeScale]);
+
   return (
     <div className="space-y-6">
       {/* Action Buttons */}
-      <div className="flex justify-end space-x-3">
+      <div className="flex flex-wrap justify-end gap-2">
         <button
           onClick={() => setShowOptimizeModal(true)}
-          className="px-4 py-2 bg-wsu-crimson text-white rounded-lg hover:bg-red-800 transition"
+          className="w-full sm:w-auto px-3 py-2 sm:px-4 sm:py-2 bg-wsu-crimson text-white rounded-md hover:bg-red-800 transition touch-manipulation text-sm"
+          aria-label="Optimize schedule"
         >
-          Optimize Schedule
+          Optimize
         </button>
         <button
           onClick={handleExport}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          className="w-full sm:w-auto px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition touch-manipulation text-sm"
+          aria-label="Export plan"
         >
           Export
         </button>
-        <label className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition cursor-pointer">
-          Import
+        <label className="w-full sm:w-auto flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition cursor-pointer touch-manipulation text-sm">
+          <span>Import</span>
           <input type="file" accept=".xlsx" onChange={handleImport} className="hidden" />
         </label>
         <button
           onClick={handleResetPlan}
-          className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+          className="w-full sm:w-auto px-3 py-2 sm:px-3 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition touch-manipulation text-sm"
           title="Reset Plan"
+          aria-label="Reset plan"
         >
-          × Reset Plan
+          Reset
         </button>
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-5 gap-4">
-        <div
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+        <button
+          type="button"
           onClick={() => setShowGradeScale(!showGradeScale)}
-          className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition"
+          aria-pressed={showGradeScale}
+          aria-label="Cumulative GPA - tap to view grade scale"
+          className="bg-white px-3 py-2 rounded-md shadow hover:shadow-md transition touch-manipulation w-full text-sm cursor-pointer text-center"
         >
-          <div className="text-3xl font-bold text-wsu-crimson">{gpa}</div>
-          <div className="text-sm text-gray-600">Cumulative GPA</div>
-          <div className="text-xs text-gray-400 mt-1">Click for scale</div>
+          <div className="text-xl font-bold text-wsu-crimson">{gpa}</div>
+          <div className="text-xs text-gray-600">Cumulative GPA</div>
+          <div className="text-[11px] text-gray-400 mt-1">Tap for scale</div>
+        </button>
+
+        <div className="bg-white px-3 py-2 rounded-md shadow touch-manipulation text-sm text-center">
+          <div className="text-xl font-bold text-green-600">{creditsAchieved}</div>
+          <div className="text-xs text-gray-600">Credits Achieved</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-3xl font-bold text-green-600">{creditsAchieved}</div>
-          <div className="text-sm text-gray-600">Credits Achieved</div>
+
+        <div className="bg-white px-3 py-2 rounded-md shadow touch-manipulation text-sm text-center">
+          <div className="text-xl font-bold text-blue-600">{creditsPlanned}</div>
+          <div className="text-xs text-gray-600">Credits Planned</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-3xl font-bold text-blue-600">{creditsPlanned}</div>
-          <div className="text-sm text-gray-600">Credits Planned</div>
+
+        <div className="bg-white px-3 py-2 rounded-md shadow touch-manipulation text-sm text-center">
+          <div className="text-xl font-bold text-purple-600">{creditsRequired}</div>
+          <div className="text-xs text-gray-600">Credits Required</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-3xl font-bold text-purple-600">{creditsRequired}</div>
-          <div className="text-sm text-gray-600">Credits Required</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-2xl font-bold text-gray-900">{progress}</div>
-          <div className="text-sm text-gray-600">Ready to Graduate</div>
+
+        <div className="bg-white px-3 py-2 rounded-md shadow touch-manipulation text-sm text-center">
+            <div className="min-h-[2.25rem] flex flex-col items-center justify-center">
+              <div className="text-lg font-bold text-gray-900 break-words">{progress || 'Not Started'}</div>
+              <div className="text-xs text-gray-600 mt-1">Ready to Graduate</div>
+            </div>
         </div>
       </div>
 
-      {/* Grade Scale Modal */}
+      {/* Grade Scale Modal (overlay) */}
       {showGradeScale && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <h3 className="font-semibold mb-2">WSU Grade Scale</h3>
-          <div className="grid grid-cols-6 gap-2 text-sm">
-            {Object.entries(GRADE_POINTS).map(([grade, points]) => (
-              <div key={grade} className="flex justify-between bg-white px-2 py-1 rounded">
-                <span className="font-medium">{grade}</span>
-                <span className="text-gray-600">{points.toFixed(1)}</span>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="WSU Grade Scale"
+          onClick={() => setShowGradeScale(false)}
+        >
+          <div className="absolute inset-0 bg-black bg-opacity-40" />
+          <div
+            className="relative z-10 w-full max-w-md mx-4 bg-white rounded-lg shadow-lg overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h3 className="font-semibold text-lg">WSU Grade Scale</h3>
+              <button
+                onClick={() => setShowGradeScale(false)}
+                className="text-gray-600 hover:text-gray-800 rounded p-1"
+                aria-label="Close grade scale"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4">
+              <p className="text-sm text-gray-700 mb-3">This shows the standard grade-to-point mapping used for GPA calculations.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+                {Object.entries(GRADE_POINTS).map(([grade, points]) => (
+                  <div key={grade} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
+                    <div className="font-medium">{grade}</div>
+                    <div className="text-gray-600">{points.toFixed(1)}</div>
+                  </div>
+                ))}
               </div>
-            ))}
+              <div className="mt-3 text-xs text-gray-500">Tip: press <span className="font-medium">Esc</span> or tap outside to close.</div>
+            </div>
           </div>
-          <p className="text-xs text-gray-600 mt-3">
-            <strong>Calculation:</strong> GPA = Total Grade Points / Total Credits
-          </p>
         </div>
+      )}
+
+      {/* Class Grade Calculator modal (opened per-course) */}
+      {showClassCalc && (
+        <ClassGradeCalculator
+          courseName={classCalcCourseName}
+          onClose={() => { setShowClassCalc(false); setClassCalcCourseName(null); }}
+        />
       )}
 
         {/* Catalog Course Picker Modal */}
@@ -2522,6 +2592,9 @@ function DegreePlanner() {
               canDelete={years.length > 1}
               hideHeader={true}
               openCatalogForCourse={openCatalogForCourse}
+              openClassCalc={(name) => { console.log('[DegreePlanner] openClassCalc ->', name); setClassCalcCourseName(name); setShowClassCalc(true); }}
+              activeTermTab={activeTermTab}
+              setActiveTermTab={setActiveTermTab}
             />
           ))}
         </div>
@@ -2588,11 +2661,17 @@ function DegreePlanner() {
   );
 }
 
-// Year Section Component
-function YearSection({ year, degreePlan, setDegreePlan, onDeleteYear, canDelete, hideHeader, openCatalogForCourse }) {
+  // Year Section Component
+function YearSection({ year, degreePlan, setDegreePlan, onDeleteYear, canDelete, hideHeader, openCatalogForCourse, openClassCalc, activeTermTab, setActiveTermTab }) {
   const [expanded, setExpanded] = useState(true);
 
   const yearData = degreePlan[year.id] || { fall: { courses: [] }, spring: { courses: [] }, summer: { courses: [] } };
+
+  const termNames = [
+    { key: 'fall', label: 'Fall' },
+    { key: 'spring', label: 'Spring' },
+    { key: 'summer', label: 'Summer' }
+  ];
 
   return (
     <div className={hideHeader ? '' : 'bg-white rounded-lg shadow'}>
@@ -2622,44 +2701,105 @@ function YearSection({ year, degreePlan, setDegreePlan, onDeleteYear, canDelete,
           )}
         </div>
       )}
-      
-      {(hideHeader || expanded) && (
-        <div className={hideHeader ? 'grid grid-cols-3 gap-4' : 'p-4 grid grid-cols-3 gap-4'}>
-          <TermCard
-            title="Fall"
-            term="fall"
-            yearId={year.id}
-            courses={yearData.fall.courses}
-            degreePlan={degreePlan}
-            setDegreePlan={setDegreePlan}
-            openCatalogForCourse={openCatalogForCourse}
-          />
-          <TermCard
-            title="Spring"
-            term="spring"
-            yearId={year.id}
-            courses={yearData.spring.courses}
-            degreePlan={degreePlan}
-            setDegreePlan={setDegreePlan}
-            openCatalogForCourse={openCatalogForCourse}
-          />
-          <TermCard
-            title="Summer"
-            term="summer"
-            yearId={year.id}
-            courses={yearData.summer.courses}
-            degreePlan={degreePlan}
-            setDegreePlan={setDegreePlan}
-            openCatalogForCourse={openCatalogForCourse}
-          />
+
+      {/* Mobile Term Tabs (visible only on small screens) */}
+      <div className="md:hidden px-4 pt-3">
+        <div className="flex bg-gray-50 rounded-lg overflow-hidden">
+          {termNames.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTermTab(t.key)}
+              className={`mobile-tab ${activeTermTab === t.key ? 'mobile-tab-active' : 'mobile-tab-inactive'}`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {(hideHeader || expanded) && (
+        <>
+          {/* Desktop: three columns */}
+          <div className="hidden md:grid md:grid-cols-3 md:gap-4 p-4">
+            <TermCard
+              title="Fall"
+              term="fall"
+              yearId={year.id}
+              courses={yearData.fall.courses}
+              degreePlan={degreePlan}
+              setDegreePlan={setDegreePlan}
+              openCatalogForCourse={openCatalogForCourse}
+              openClassCalc={openClassCalc}
+            />
+            <TermCard
+              title="Spring"
+              term="spring"
+              yearId={year.id}
+              courses={yearData.spring.courses}
+              degreePlan={degreePlan}
+              setDegreePlan={setDegreePlan}
+              openCatalogForCourse={openCatalogForCourse}
+              openClassCalc={openClassCalc}
+            />
+            <TermCard
+              title="Summer"
+              term="summer"
+              yearId={year.id}
+              courses={yearData.summer.courses}
+              degreePlan={degreePlan}
+              setDegreePlan={setDegreePlan}
+              openCatalogForCourse={openCatalogForCourse}
+              openClassCalc={openClassCalc}
+            />
+          </div>
+
+          {/* Mobile: only show the active term */}
+          <div className="md:hidden px-4">
+            {activeTermTab === 'fall' && (
+              <TermCard
+                title="Fall"
+                term="fall"
+                yearId={year.id}
+                courses={yearData.fall.courses}
+                degreePlan={degreePlan}
+                setDegreePlan={setDegreePlan}
+                openCatalogForCourse={openCatalogForCourse}
+                openClassCalc={openClassCalc}
+              />
+            )}
+            {activeTermTab === 'spring' && (
+              <TermCard
+                title="Spring"
+                term="spring"
+                yearId={year.id}
+                courses={yearData.spring.courses}
+                degreePlan={degreePlan}
+                setDegreePlan={setDegreePlan}
+                openCatalogForCourse={openCatalogForCourse}
+                openClassCalc={openClassCalc}
+              />
+            )}
+            {activeTermTab === 'summer' && (
+              <TermCard
+                title="Summer"
+                term="summer"
+                yearId={year.id}
+                courses={yearData.summer.courses}
+                degreePlan={degreePlan}
+                setDegreePlan={setDegreePlan}
+                openCatalogForCourse={openCatalogForCourse}
+                openClassCalc={openClassCalc}
+              />
+            )}
+          </div>
+        </>
       )}
     </div>
   );
 }
 
 // Term Card Component
-function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, openCatalogForCourse }) {
+function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, openCatalogForCourse, openClassCalc }) {
   const totalCredits = courses.reduce((sum, c) => sum + (c.credits || 0), 0);
   
   const calculateTermGPA = () => {
@@ -2749,6 +2889,7 @@ function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, ope
             yearId={yearId}
             term={term}
             openCatalog={openCatalogForCourse}
+            openClassCalc={openClassCalc}
           />
         ))}
       </div>
@@ -2771,7 +2912,7 @@ function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, ope
 }
 
 // Course Row Component with autocomplete
-function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog }) {
+function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog, openClassCalc }) {
   const textareaRef = useRef(null);
   const [courseSuggestions, setCourseSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -2803,7 +2944,16 @@ function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog }) {
           }
           grouped[key].sections.push(c);
         });
-        setCourseSuggestions(Object.values(grouped));
+        // Limit suggestions on mobile to avoid pushing other layout elements down
+        let results = Object.values(grouped);
+        try {
+          const isMobile = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
+          const maxItems = isMobile ? 5 : 20;
+          results = results.slice(0, maxItems);
+        } catch (e) {
+          // ignore and fall back to full list
+        }
+        setCourseSuggestions(results);
         setShowSuggestions(true);
       } catch (error) {
         console.error('Error searching courses:', error);
@@ -2853,7 +3003,7 @@ function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog }) {
           
           {/* Course Suggestions Dropdown */}
           {showSuggestions && courseSuggestions.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-44 md:max-h-60 overflow-y-auto">
               {courseSuggestions.map(({ key, course: c, sections }) => (
                 <div key={key} className="border-b border-gray-200 last:border-b-0">
                   <button
@@ -2920,9 +3070,28 @@ function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog }) {
             </button>
           )}
 
+          {/* Grade calculator trigger (visible on all sizes) */}
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); console.log('[CourseRow] calc button clicked', course.name); if (openClassCalc) openClassCalc(course.name || 'Course'); else console.warn('openClassCalc is not provided'); }}
+            aria-label="Open grade calculator"
+            title="Open grade calculator"
+            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+          >
+            <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M7 7h10" />
+              <path d="M7 11h4" />
+              <path d="M7 15h4" />
+            </svg>
+            <span className="sr-only">Open grade calculator</span>
+          </button>
+
           <button
             onClick={() => onRemove(course.id)}
-            className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 text-sm px-2"
+            aria-label="Remove course"
+            title="Remove course"
+            className="text-red-600 hover:text-red-800 text-sm px-2 focus:outline-none"
           >
             ×
           </button>
@@ -2937,13 +3106,13 @@ function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog }) {
           placeholder="Cr"
           min="0"
           max="18"
-          className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-wsu-crimson"
+          className="input-field text-sm"
         />
         
         <select
           value={course.status || 'not-taken'}
           onChange={(e) => onUpdate(course.id, 'status', e.target.value)}
-          className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-wsu-crimson"
+          className="select-field text-sm"
         >
           <option value="not-taken">Not Taken</option>
           <option value="planned">Planned</option>
@@ -2955,7 +3124,7 @@ function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog }) {
           value={course.grade || ''}
           onChange={(e) => onUpdate(course.id, 'grade', e.target.value)}
           disabled={course.status === 'not-taken' || course.status === 'planned'}
-          className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-wsu-crimson disabled:bg-gray-100"
+          className="select-field text-sm disabled:bg-gray-100"
         >
           <option value="">—</option>
           {Object.keys(GRADE_POINTS).map(g => (
@@ -2967,16 +3136,53 @@ function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog }) {
           {course.grade && course.credits ? ((GRADE_POINTS[course.grade] || 0) * course.credits).toFixed(1) : '—'}
         </div>
       </div>
-      {/* Footnotes / Notes for the course */}
-      {((Array.isArray(course.footnotes) && course.footnotes.length > 0) || (course.footnotes && !Array.isArray(course.footnotes))) && (
+      {/* Footnotes / Notes for the course - collapsible on mobile */}
+      {((Array.isArray(course.footnotes) && course.footnotes.length > 0) || (course.footnotes && !Array.isArray(course.footnotes))) && (() => {
+        const hasNotes = true;
+        return (
+          <CourseNotes notes={course.footnotes} />
+        );
+      })()}
+    </div>
+  );
+}
+
+// CourseNotes - separates note rendering and includes mobile-first collapsed behavior
+function CourseNotes({ notes }) {
+  const isArray = Array.isArray(notes);
+  const [open, setOpen] = useState(() => {
+    try {
+      if (typeof window !== 'undefined' && window.matchMedia) {
+        // default expanded on md+ (desktop), collapsed on small screens
+        return window.matchMedia('(min-width: 768px)').matches;
+      }
+    } catch (e) {}
+    return false;
+  });
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen(!open)}
+        className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
+        aria-expanded={open}
+      >
+        <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <span className="font-medium text-sm">Notes</span>
+        <span className="text-xs text-gray-500">{isArray ? notes.length : 1}</span>
+      </button>
+
+      {open && (
         <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-          <strong className="text-sm text-gray-700">Notes:</strong>
+          <strong className="text-sm text-gray-700">Details:</strong>
           <div className="mt-1 space-y-1">
-            {Array.isArray(course.footnotes)
-              ? course.footnotes.map((fn, i) => (
+            {isArray
+              ? notes.map((fn, i) => (
                   <div key={i} className="leading-snug">{fn}</div>
                 ))
-              : <div className="leading-snug">{course.footnotes}</div>
+              : <div className="leading-snug">{notes}</div>
             }
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import WeeklyCalendar from './WeeklyCalendar';
 import { fetchCourses, fetchTerms, fetchPrefixes } from '../utils/api';
 import { extractUCORECategories, getUCOREBadgeColor } from '../utils/courseHelpers';
 import { loadDegreePlan, saveDegreePlan } from '../utils/storage';
@@ -18,6 +19,7 @@ function CourseSearch() {
   const [prefixes, setPrefixes] = useState([]);
   const [page, setPage] = useState(1);
   const [totalCourses, setTotalCourses] = useState(0);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
   const coursesPerPage = 50;
 
   useEffect(() => {
@@ -213,6 +215,22 @@ function CourseSearch() {
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
           <h3 className="font-semibold">{totalCourses} courses found</h3>
+          <div className="flex items-center gap-2">
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-white text-wsu-crimson shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                List
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'calendar' ? 'bg-white text-wsu-crimson shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Calendar
+              </button>
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
@@ -234,66 +252,88 @@ function CourseSearch() {
           </div>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Course</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Title</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">UCORE</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Credits</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Campus</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Term</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Seats</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {courses.map((course, index) => {
-                const ucoreCategories = extractUCORECategories({ ucore: course.ucore });
-                
-                return (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-sm font-medium">{course.prefix} {course.courseNumber}</td>
-                    <td className="px-4 py-3 text-sm">{course.title}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {ucoreCategories.map(cat => (
-                          <span
-                            key={cat}
-                            className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getUCOREBadgeColor(cat)}`}
-                          >
-                            {cat}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm">{course.credits}</td>
-                    <td className="px-4 py-3 text-sm">{course.campus}</td>
-                    <td className="px-4 py-3 text-sm">{course.term} {course.year}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        course.seatsAvail > 10 ? 'bg-green-100 text-green-800' :
-                        course.seatsAvail > 0 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {course.seatsAvail}/{course.max}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleAddToPlanner(course)}
-                        className="px-3 py-1 bg-crimson text-white rounded text-xs hover:bg-crimson/90 transition"
-                      >
-                        Add to Plan
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {viewMode === 'calendar' ? (
+          <div className="p-4 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0">
+            <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-100 p-4 overflow-auto max-h-[600px]">
+              <h3 className="font-semibold text-gray-900 mb-3">Filters & Results</h3>
+              <div className="text-sm text-gray-600 mb-4">{courses.length} of results</div>
+              <div className="space-y-2 divide-y divide-gray-100">
+                {courses.map(c => (
+                  <div key={c.id || c.uniqueId} className="pt-2 first:pt-0">
+                    <div className="text-xs font-semibold text-gray-900 truncate">{c.prefix} {c.courseNumber}</div>
+                    <div className="text-xs text-gray-600 truncate">{c.title}</div>
+                    <div className="text-xs text-gray-500">{c.dayTime || 'TBA'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="h-full min-h-[400px]"><WeeklyCalendar courses={courses} /></div>
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Course</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Title</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">UCORE</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Credits</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Campus</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Term</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Seats</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {courses.map((course, index) => {
+                  const ucoreCategories = extractUCORECategories({ ucore: course.ucore });
+                  
+                  return (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-mono text-sm font-medium">{course.prefix} {course.courseNumber}</td>
+                      <td className="px-4 py-3 text-sm">{course.title}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {ucoreCategories.map(cat => (
+                            <span
+                              key={cat}
+                              className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getUCOREBadgeColor(cat)}`}
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm">{course.credits}</td>
+                      <td className="px-4 py-3 text-sm">{course.campus}</td>
+                      <td className="px-4 py-3 text-sm">{course.term} {course.year}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          course.seatsAvail > 10 ? 'bg-green-100 text-green-800' :
+                          course.seatsAvail > 0 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {course.seatsAvail}/{course.max}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleAddToPlanner(course)}
+                          className="px-3 py-1 bg-crimson text-white rounded text-xs hover:bg-crimson/90 transition"
+                        >
+                          Add to Plan
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
