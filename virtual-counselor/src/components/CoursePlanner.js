@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import ProfessorRating from './ProfessorRating';
 import { fetchCourses, fetchTerms, fetchPrefixes } from '../utils/api';
 import { saveUserCourses, loadUserCourses } from '../utils/storage';
 
@@ -873,6 +874,21 @@ function CourseDetailsModal({ course, onClose }) {
               <InfoRow label="SLN" value={course.sln || course.slnNumber || course.slnId || course.sectionSln} />
               <InfoRow label="Type" value={(course.isLab || stripHtml(course.sectionTitle || '').toLowerCase().includes('lab')) ? 'Lab' : 'Lecture'} />
               <InfoRow label="Instructor" value={parseInstructors(course)} />
+              {(() => {
+                const inst = parseInstructors(course);
+                if (inst && inst !== 'Staff') {
+                  // Use first listed instructor for rating lookup
+                  const first = inst.split(',')[0].trim();
+                  return (
+                    <div className="col-span-2">
+                      <div className="mt-2">
+                        <ProfessorRating name={first} />
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <InfoRow label="Time" value={formatDayTime(course.dayTime)} />
               {(() => {
                 const dr = getCourseDateRange(course);
