@@ -197,6 +197,34 @@ function DegreeSelector({
                     <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
                       {prog.data.degree.narrative}
                     </div>
+                    {prog.data?.courses && prog.data.courses.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-sm font-medium text-gray-700 mb-2">Extracted Courses</div>
+                        {prog.data.requiredCourses && prog.data.requiredCourses.length > 0 && (
+                          <div className="mb-2">
+                            <div className="text-xs font-semibold text-gray-600 mb-1">Required</div>
+                            <div className="flex flex-wrap gap-2">
+                              {prog.data.requiredCourses.map((c, i) => (
+                                <span key={`req-${i}`} className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {prog.data.electiveCourses && prog.data.electiveCourses.length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-gray-600 mb-1">Electives</div>
+                            <div className="flex flex-wrap gap-2">
+                              {prog.data.electiveCourses.map((c, i) => (
+                                <span key={`elec-${i}`} className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded">{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {(!prog.data.requiredCourses || prog.data.requiredCourses.length === 0) && (!prog.data.electiveCourses || prog.data.electiveCourses.length === 0) && (
+                          <div className="text-sm text-gray-600 mt-2">{prog.data.courses.join(', ')}</div>
+                        )}
+                      </div>
+                    )}
                   </details>
                 )}
               </div>
@@ -227,6 +255,34 @@ function DegreeSelector({
                     <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
                       {prog.data.degree.narrative}
                     </div>
+                    {prog.data?.courses && prog.data.courses.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-sm font-medium text-gray-700 mb-2">Extracted Courses</div>
+                        {prog.data.requiredCourses && prog.data.requiredCourses.length > 0 && (
+                          <div className="mb-2">
+                            <div className="text-xs font-semibold text-gray-600 mb-1">Required</div>
+                            <div className="flex flex-wrap gap-2">
+                              {prog.data.requiredCourses.map((c, i) => (
+                                <span key={`req-cert-${i}`} className="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded">{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {prog.data.electiveCourses && prog.data.electiveCourses.length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-gray-600 mb-1">Electives</div>
+                            <div className="flex flex-wrap gap-2">
+                              {prog.data.electiveCourses.map((c, i) => (
+                                <span key={`elec-cert-${i}`} className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded">{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {(!prog.data.requiredCourses || prog.data.requiredCourses.length === 0) && (!prog.data.electiveCourses || prog.data.electiveCourses.length === 0) && (
+                          <div className="text-sm text-gray-600 mt-2">{prog.data.courses.join(', ')}</div>
+                        )}
+                      </div>
+                    )}
                   </details>
                 )}
               </div>

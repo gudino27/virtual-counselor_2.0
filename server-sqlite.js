@@ -462,6 +462,52 @@ db.serialize(() => {
   db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_catalog_courses_unique ON catalog_courses(unique_id, catalog_year)');
   db.run('CREATE INDEX IF NOT EXISTS idx_catalog_courses_code ON catalog_courses(code)');
 
+  // Catalog minors table (historical data with narratives)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS catalog_minors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      catalog_year TEXT NOT NULL,
+      url TEXT,
+      source_type TEXT DEFAULT 'api',
+      narrative TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(name, catalog_year)
+    )
+  `, (err) => {
+    if (err) console.error('Warning: Could not create catalog_minors table:', err.message);
+  });
+  db.run('CREATE INDEX IF NOT EXISTS idx_catalog_minors_year ON catalog_minors(catalog_year)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_catalog_minors_name ON catalog_minors(name)');
+
+  // Catalog certificates table (historical data with descriptions)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS catalog_certificates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      catalog_year TEXT NOT NULL,
+      url TEXT,
+      source_type TEXT DEFAULT 'api',
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(name, catalog_year)
+    )
+  `, (err) => {
+    if (err) console.error('Warning: Could not create catalog_certificates table:', err.message);
+  });
+  db.run('CREATE INDEX IF NOT EXISTS idx_catalog_certificates_year ON catalog_certificates(catalog_year)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_catalog_certificates_name ON catalog_certificates(name)');
+
+  // Add courses columns if they don't exist (for existing databases)
+  db.run('ALTER TABLE catalog_minors ADD COLUMN courses TEXT', () => {});
+  db.run('ALTER TABLE catalog_minors ADD COLUMN required_courses TEXT', () => {});
+  db.run('ALTER TABLE catalog_minors ADD COLUMN elective_courses TEXT', () => {});
+  db.run('ALTER TABLE catalog_certificates ADD COLUMN courses TEXT', () => {});
+  db.run('ALTER TABLE catalog_certificates ADD COLUMN required_courses TEXT', () => {});
+  db.run('ALTER TABLE catalog_certificates ADD COLUMN elective_courses TEXT', () => {});
+
   console.log('✅ Database tables created/verified');
 });
 
@@ -570,6 +616,118 @@ function sendServerError(res, error) {
 async function runInTransaction(callback) {
   return withTransaction(callback);
 }
+
+// ============================================
+// AUTO-IMPORT HISTORICAL CATALOG DATA
+// ============================================
+
+// Import historical catalog minors/certificates from parsed PDF JSON files
+// Only runs once if the data isn't already populated
+async function importHistoricalCatalogData() {
+  const catalogDir = path.join(__dirname, 'pdf-archieved-catalog');
+
+  // Check if catalog directory exists
+  if (!fs.existsSync(catalogDir)) {
+    console.log('📁 No pdf-archieved-catalog directory found, skipping historical import');
+    return;
+  }
+
+  try {
+    // Check if historical data already exists with narratives/descriptions
+    const minorCheck = await dbGet(
+      'SELECT COUNT(*) as count FROM catalog_minors WHERE narrative IS NOT NULL AND narrative != ""'
+    );
+    const certCheck = await dbGet(
+      'SELECT COUNT(*) as count FROM catalog_certificates WHERE description IS NOT NULL AND description != ""'
+    );
+
+    // If we already have substantial data, skip import
+    if ((minorCheck?.count || 0) > 100 && (certCheck?.count || 0) > 50) {
+      console.log(`📚 Historical catalog data already populated (${minorCheck.count} minors, ${certCheck.count} certificates with narratives)`);
+      return;
+    }
+
+    console.log('📚 Importing historical catalog data from PDF archives...');
+
+    // Find all parsed JSON files
+    const jsonFiles = fs.readdirSync(catalogDir)
+      .filter(f => f.endsWith('-parsed.json'))
+      .sort();
+
+    if (jsonFiles.length === 0) {
+      console.log('  No -parsed.json files found in pdf-archieved-catalog');
+      return;
+    }
+
+    let totalMinors = 0;
+    let totalCerts = 0;
+
+    for (const jsonFile of jsonFiles) {
+      const year = jsonFile.match(/(\d{4})/)?.[1];
+      if (!year) continue;
+
+      const filePath = path.join(catalogDir, jsonFile);
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+      // Import minors (with extracted courses)
+      for (const minor of (data.minors || [])) {
+        try {
+          await dbRun(`
+            INSERT OR REPLACE INTO catalog_minors
+            (name, catalog_year, url, source_type, narrative, courses, required_courses, elective_courses)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            minor.name,
+            year,
+            null,
+            'pdf',
+            minor.narrative || null,
+            JSON.stringify(minor.courses || []),
+            JSON.stringify(minor.requiredCourses || []),
+            JSON.stringify(minor.electiveCourses || [])
+          ]);
+          totalMinors++;
+        } catch (err) {
+          // Ignore duplicate errors
+        }
+      }
+
+      // Import certificates (with extracted courses)
+      for (const cert of (data.certificates || [])) {
+        try {
+          await dbRun(`
+            INSERT OR REPLACE INTO catalog_certificates
+            (name, catalog_year, url, source_type, description, courses, required_courses, elective_courses)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            cert.name,
+            year,
+            null,
+            'pdf',
+            cert.description || null,
+            JSON.stringify(cert.courses || []),
+            JSON.stringify(cert.requiredCourses || []),
+            JSON.stringify(cert.electiveCourses || [])
+          ]);
+          totalCerts++;
+        } catch (err) {
+          // Ignore duplicate errors
+        }
+      }
+    }
+
+    console.log(`  ✅ Imported ${totalMinors} minors and ${totalCerts} certificates from ${jsonFiles.length} catalog years`);
+  } catch (err) {
+    console.error('  ⚠️ Error importing historical catalog data:', err.message);
+  }
+}
+
+// Run import after a short delay to ensure tables are created
+setTimeout(() => {
+  importHistoricalCatalogData().catch(err => {
+    console.error('Failed to import historical catalog data:', err);
+  });
+}, 2000);
 
 // ============================================
 // API ENDPOINTS
@@ -775,13 +933,12 @@ app.get('/api/degree-requirements', async (req, res) => {
 
     if (type === 'minor') {
       dbDegree = await dbGet(
-        'SELECT id, name, url, catalog_year FROM catalog_minors WHERE name = ? ORDER BY catalog_year DESC LIMIT 1',
+        'SELECT id, name, url, catalog_year, narrative, courses, required_courses, elective_courses FROM catalog_minors WHERE name = ? ORDER BY catalog_year DESC LIMIT 1',
         [name]
       );
     } else if (type === 'certificate') {
-      tableName = 'catalog_certificates';
       dbDegree = await dbGet(
-        'SELECT id, name, url, catalog_year FROM catalog_certificates WHERE name = ? ORDER BY catalog_year DESC LIMIT 1',
+        'SELECT id, name, url, catalog_year, description, courses, required_courses, elective_courses FROM catalog_certificates WHERE name = ? ORDER BY catalog_year DESC LIMIT 1',
         [name]
       );
     } else {
@@ -865,20 +1022,40 @@ app.get('/api/degree-requirements', async (req, res) => {
     // STEP 2: For minors/certificates found in DB but without requirements, return basic info
     if (dbDegree && (type === 'minor' || type === 'certificate')) {
       console.log(`️ Found ${type} "${name}" in database (no detailed requirements available)`);
+      // Certificates use 'description' field, minors use 'narrative'
+      const narrativeText = dbDegree.narrative || dbDegree.description || `This ${type} requires specific courses. Please consult with your advisor.`;
+
+      // Parse stored extracted courses if present
+      let parsedCourses = [];
+      let parsedRequired = [];
+      let parsedElective = [];
+      try {
+        if (dbDegree.courses) parsedCourses = JSON.parse(dbDegree.courses);
+      } catch (e) { parsedCourses = []; }
+      try {
+        if (dbDegree.required_courses) parsedRequired = JSON.parse(dbDegree.required_courses);
+      } catch (e) { parsedRequired = []; }
+      try {
+        if (dbDegree.elective_courses) parsedElective = JSON.parse(dbDegree.elective_courses);
+      } catch (e) { parsedElective = []; }
+
       return res.json({
         degree: {
           title: dbDegree.name,
           totalHours: dbDegree.credits || null,
-          narrative: dbDegree.narrative || `This ${type} requires specific courses. Please consult with your advisor.`,
+          narrative: narrativeText,
           acadUnit: dbDegree.college || null,
           url: dbDegree.url
         },
         schedule: [],
-        totalCoursesInSequence: 0,
+        totalCoursesInSequence: parsedCourses.length,
         estimatedCredits: 0,
         source: 'database',
         type: type,
-        note: `Detailed course requirements for ${type}s are not yet available. Please check the WSU catalog for full requirements.`
+        courses: parsedCourses,
+        requiredCourses: parsedRequired,
+        electiveCourses: parsedElective,
+        note: parsedCourses.length === 0 ? `Detailed course requirements for ${type}s are not yet available. Please check the WSU catalog for full requirements.` : undefined
       });
     }
 
@@ -2533,29 +2710,29 @@ app.post('/webhook/catalog-programs', webhookAuth, async (req, res) => {
       }
     }
     
-    // Insert minors
+    // Insert minors (with narrative support)
     for (const minor of minors) {
       try {
         await dbRun(
-          `INSERT OR REPLACE INTO catalog_minors 
-           (name, catalog_year, url, source_type) 
-           VALUES (?, ?, ?, ?)`,
-          [minor.name, catalogYear, minor.url || null, sourceType]
+          `INSERT OR REPLACE INTO catalog_minors
+           (name, catalog_year, url, source_type, narrative)
+           VALUES (?, ?, ?, ?, ?)`,
+          [minor.name, catalogYear, minor.url || null, sourceType, minor.narrative || null]
         );
         results.added.minors++;
       } catch (err) {
         results.errors.push({ type: 'minor', name: minor.name, error: err.message });
       }
     }
-    
-    // Insert certificates
+
+    // Insert certificates (with description support)
     for (const cert of certificates) {
       try {
         await dbRun(
-          `INSERT OR REPLACE INTO catalog_certificates 
-           (name, catalog_year, url, source_type) 
-           VALUES (?, ?, ?, ?)`,
-          [cert.name, catalogYear, cert.url || null, sourceType]
+          `INSERT OR REPLACE INTO catalog_certificates
+           (name, catalog_year, url, source_type, description)
+           VALUES (?, ?, ?, ?, ?)`,
+          [cert.name, catalogYear, cert.url || null, sourceType, cert.description || cert.narrative || null]
         );
         results.added.certificates++;
       } catch (err) {
