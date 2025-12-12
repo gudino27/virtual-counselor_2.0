@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import WeeklyCalendar from './WeeklyCalendar';
 import { fetchCourses, fetchTerms, fetchPrefixes } from '../utils/api';
 import { extractUCORECategories, getUCOREBadgeColor } from '../utils/courseHelpers';
@@ -53,7 +54,7 @@ function CourseSearch() {
       setTotalCourses(data.total || 0);
     } catch (error) {
       console.error('Error searching courses:', error);
-      alert('Error searching courses: ' + error.message);
+      toast.error('Error searching courses: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -63,7 +64,7 @@ function CourseSearch() {
     // Load the saved degree plan using the storage helper. Support legacy structures.
     const saved = loadDegreePlan();
     if (!saved || (!saved.plan && !saved.degreePlan && !saved.years)) {
-      alert('Please select a degree in the Degree Planner first');
+      toast.error('Please select a degree in the Degree Planner first');
       return;
     }
 
@@ -90,7 +91,7 @@ function CourseSearch() {
       }
 
       if (!planObj) {
-        alert('Unable to read degree plan structure. Please open Degree Planner and select a degree.');
+        toast.error('Unable to read degree plan structure. Please open Degree Planner and select a degree.');
         return;
       }
 
@@ -117,13 +118,13 @@ function CourseSearch() {
         // Save back using saveDegreePlan
         const saveObj = { plan: planObj, years: saved.years || yearsArr, programs: saved.programs || {} };
         saveDegreePlan(saveObj);
-        alert(`Added ${course.prefix} ${course.courseNumber} to your degree plan!`);
+        toast.success(`Added ${course.prefix} ${course.courseNumber} to your degree plan!`);
       } else {
-        alert('No empty slots available. Add more courses or years in the Degree Planner.');
+        toast.error('No empty slots available. Add more courses or years in the Degree Planner.');
       }
     } catch (error) {
       console.error('Error adding to planner:', error);
-      alert('Error adding course to planner');
+      toast.error('Error adding course to planner');
     }
   };
 

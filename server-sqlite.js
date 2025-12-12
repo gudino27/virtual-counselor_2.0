@@ -764,17 +764,33 @@ app.get('/api/degrees', async (req, res) => {
 // First tries database (for saved requirements), then falls back to WSU API
 app.get('/api/degree-requirements', async (req, res) => {
   try {
-    const { name, acadUnitId: providedAcadUnitId } = req.query;
-    
+    const { name, acadUnitId: providedAcadUnitId, type = 'degree' } = req.query;
+
     if (!name) {
       return res.status(400).json({ error: 'Degree name is required' });
     }
-    
-    // STEP 1: Try to fetch from database first
-    const dbDegree = await dbGet(
-      'SELECT id, name, credits, college, url, catalog_year, narrative FROM catalog_degrees WHERE name = ? ORDER BY catalog_year DESC LIMIT 1',
-      [name]
-    );
+
+    // STEP 1: Try to fetch from database first based on type
+    let dbDegree = null;
+
+    if (type === 'minor') {
+      dbDegree = await dbGet(
+        'SELECT id, name, url, catalog_year FROM catalog_minors WHERE name = ? ORDER BY catalog_year DESC LIMIT 1',
+        [name]
+      );
+    } else if (type === 'certificate') {
+      tableName = 'catalog_certificates';
+      dbDegree = await dbGet(
+        'SELECT id, name, url, catalog_year FROM catalog_certificates WHERE name = ? ORDER BY catalog_year DESC LIMIT 1',
+        [name]
+      );
+    } else {
+      // Default: degree
+      dbDegree = await dbGet(
+        'SELECT id, name, credits, college, url, catalog_year, narrative FROM catalog_degrees WHERE name = ? ORDER BY catalog_year DESC LIMIT 1',
+        [name]
+      );
+    }
     
     if (dbDegree) {
       // Check if we have course requirements saved
@@ -846,33 +862,62 @@ app.get('/api/degree-requirements', async (req, res) => {
       }
     }
     
-    // STEP 2: Fall back to WSU API if not in database
+    // STEP 2: For minors/certificates found in DB but without requirements, return basic info
+    if (dbDegree && (type === 'minor' || type === 'certificate')) {
+      console.log(`️ Found ${type} "${name}" in database (no detailed requirements available)`);
+      return res.json({
+        degree: {
+          title: dbDegree.name,
+          totalHours: dbDegree.credits || null,
+          narrative: dbDegree.narrative || `This ${type} requires specific courses. Please consult with your advisor.`,
+          acadUnit: dbDegree.college || null,
+          url: dbDegree.url
+        },
+        schedule: [],
+        totalCoursesInSequence: 0,
+        estimatedCredits: 0,
+        source: 'database',
+        type: type,
+        note: `Detailed course requirements for ${type}s are not yet available. Please check the WSU catalog for full requirements.`
+      });
+    }
+
+    // STEP 3: Fall back to WSU API if not in database (degrees only)
     console.log(`⚠️ No saved requirements for "${name}", fetching from WSU API...`);
-    
+
+    // For minors/certificates not in our DB, return a helpful error
+    if (type === 'minor' || type === 'certificate') {
+      return res.status(404).json({
+        error: `${type.charAt(0).toUpperCase() + type.slice(1)} not found`,
+        searchedFor: name,
+        suggestion: 'Please check the WSU catalog for available programs'
+      });
+    }
+
     let acadUnitId = providedAcadUnitId;
     let degreeInfo = null;
-    
+
     if (!acadUnitId && dbDegree?.external_id) {
       acadUnitId = dbDegree.external_id;
     }
-    
+
     if (!acadUnitId) {
       const degreesResponse = await fetch('https://catalog.wsu.edu/api/Data/GetDegreesDropdown/General');
       const degrees = await degreesResponse.json();
-      
+
       // Find matching degree (case-insensitive partial match)
-      degreeInfo = degrees.find(d => 
+      degreeInfo = degrees.find(d =>
         d.title.toLowerCase() === name.toLowerCase() ||
         d.label.toLowerCase().includes(name.toLowerCase())
       );
-      
+
       if (!degreeInfo) {
-        return res.status(404).json({ 
-          error: 'Degree not found in WSU catalog', 
-          searchedFor: name 
+        return res.status(404).json({
+          error: 'Degree not found in WSU catalog',
+          searchedFor: name
         });
       }
-      
+
       acadUnitId = degreeInfo.acadUnitId;
     }
     
@@ -1391,25 +1436,30 @@ app.get('/api/courses', async (req, res) => {
       params.push(parseInt(year, 10));
     }
     if (prefix) {
-      whereClauses.push('LOWER(prefix) = LOWER(?)');
-      params.push(prefix);
+      // Normalize prefix - match both with and without spaces (e.g., "CPTS" matches "CPT S")
+      const normalizedPrefix = prefix.toUpperCase().replace(/\s+/g, '');
+      whereClauses.push('(LOWER(prefix) = LOWER(?) OR UPPER(REPLACE(prefix, \' \', \'\')) = ?)');
+      params.push(prefix, normalizedPrefix);
     }
     if (seatsAvailable) {
       whereClauses.push('seatsAvailable >= ?');
       params.push(parseInt(seatsAvailable, 10));
     }
     if (search) {
-      // Case-insensitive search with support for variations like "cpts" matching "Cpt S"
+      // Case-insensitive search with support for variations like "cpts111" matching "Cpt S 111"
+      const normalizedSearch = search.toUpperCase().replace(/\s+/g, '');
       whereClauses.push(`(
-        LOWER(prefix) LIKE LOWER(?) OR 
-        LOWER(title) LIKE LOWER(?) OR 
-        LOWER(instructor) LIKE LOWER(?) OR 
+        LOWER(prefix) LIKE LOWER(?) OR
+        LOWER(title) LIKE LOWER(?) OR
+        LOWER(instructor) LIKE LOWER(?) OR
         LOWER(courseNumber) LIKE LOWER(?) OR
         LOWER(REPLACE(prefix, ' ', '')) LIKE LOWER(REPLACE(?, ' ', '')) OR
-        LOWER(prefix || ' ' || courseNumber) LIKE LOWER(?)
+        LOWER(prefix || ' ' || courseNumber) LIKE LOWER(?) OR
+        UPPER(REPLACE(prefix, ' ', '') || courseNumber) LIKE ?
       )`);
       const searchTerm = `%${search}%`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      const normalizedSearchTerm = `%${normalizedSearch}%`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, normalizedSearchTerm);
     }
 
     const whereClause = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
@@ -1445,16 +1495,42 @@ app.get('/api/courses/search', async (req, res) => {
       return res.status(400).json({ error: 'Search query (q) is required' });
     }
 
+    // Normalize the search query - strip spaces and uppercase for comparison
+    const normalizedQuery = q.toUpperCase().replace(/\s+/g, '');
+
+    // Try to detect if this looks like a course code (e.g., "cpts111" or "cpt s 111")
+    const courseCodeMatch = normalizedQuery.match(/^([A-Z]+)(\d{3}\w?)$/);
+
     const searchTerm = `%${q}%`;
-    const courses = await dbAll(`
-      SELECT * FROM courses
-      WHERE LOWER(prefix) LIKE LOWER(?)
-         OR LOWER(courseNumber) LIKE LOWER(?)
-         OR LOWER(title) LIKE LOWER(?)
-         OR LOWER(REPLACE(prefix, ' ', '')) LIKE LOWER(REPLACE(?, ' ', ''))
-         OR LOWER(prefix || ' ' || courseNumber) LIKE LOWER(?)
-      LIMIT ?
-    `, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, parseInt(limit, 10)]);
+    const normalizedSearchTerm = `%${normalizedQuery}%`;
+
+    // Build the query with normalized matching
+    let courses;
+    if (courseCodeMatch) {
+      // User is searching for something like "cpts111" - try to match prefix + number
+      const prefixPart = courseCodeMatch[1];
+      const numberPart = courseCodeMatch[2];
+      courses = await dbAll(`
+        SELECT * FROM courses
+        WHERE (UPPER(REPLACE(prefix, ' ', '')) = ? AND courseNumber = ?)
+           OR LOWER(prefix) LIKE LOWER(?)
+           OR LOWER(courseNumber) LIKE LOWER(?)
+           OR LOWER(title) LIKE LOWER(?)
+           OR LOWER(REPLACE(prefix, ' ', '') || courseNumber) LIKE LOWER(?)
+        LIMIT ?
+      `, [prefixPart, numberPart, searchTerm, searchTerm, searchTerm, normalizedSearchTerm, parseInt(limit, 10)]);
+    } else {
+      courses = await dbAll(`
+        SELECT * FROM courses
+        WHERE LOWER(prefix) LIKE LOWER(?)
+           OR LOWER(courseNumber) LIKE LOWER(?)
+           OR LOWER(title) LIKE LOWER(?)
+           OR LOWER(REPLACE(prefix, ' ', '')) LIKE LOWER(REPLACE(?, ' ', ''))
+           OR LOWER(prefix || ' ' || courseNumber) LIKE LOWER(?)
+           OR LOWER(REPLACE(prefix, ' ', '') || courseNumber) LIKE LOWER(?)
+        LIMIT ?
+      `, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, normalizedSearchTerm, parseInt(limit, 10)]);
+    }
 
     res.json({ courses, total: courses.length });
   } catch (error) {
@@ -2809,13 +2885,13 @@ app.use((err, req, res, next) => {
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-  console.log('\n🛑 Shutting down gracefully...');
+  console.log('\n Shutting down gracefully...');
   db.close((err) => {
     if (err) {
       console.error('Error closing database:', err);
 
     } else {
-      console.log('✅ Database closed');
+      console.log(' Database closed');
     }
     process.exit(0);
   });
@@ -2824,13 +2900,13 @@ process.on('SIGINT', () => {
 // Start server
 app.listen(PORT, () => {
   console.log('');
-  console.log('🚀 WSU Course Scraper API Server (SQLITE)');
-  console.log(`📍 Running on http://localhost:${PORT}`);
-  console.log(`💚 Health check: http://localhost:${PORT}/health`);
-  console.log(`📊 Statistics: http://localhost:${PORT}/api/stats`);
-  console.log(`🎣 Webhook: http://localhost:${PORT}/webhook/courses`);
+  console.log(' WSU Course Scraper API Server (SQLITE)');
+  console.log(` Running on http://localhost:${PORT}`);
+  console.log(` Health check: http://localhost:${PORT}/health`);
+  console.log(` Statistics: http://localhost:${PORT}/api/stats`);
+  console.log(` Webhook: http://localhost:${PORT}/webhook/courses`);
   console.log('');
-  console.log('✨ SQLite Features:');
+  console.log(' SQLite Features:');
   console.log('   - No file locking issues!');
   console.log('   - ACID transactions (atomic, consistent)');
   console.log('   - Concurrent access (WAL mode)');

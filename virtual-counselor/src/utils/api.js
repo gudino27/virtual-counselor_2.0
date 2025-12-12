@@ -35,6 +35,11 @@ export async function searchCourses(query, limit = 100) {
   return fetchJSON(`/api/courses/search?q=${encodeURIComponent(query)}&limit=${limit}`);
 }
 
+// Search catalog courses (unique courses with descriptions, not sections)
+export async function searchCatalogCourses(query, limit = 5) {
+  return fetchJSON(`/api/catalog/courses?search=${encodeURIComponent(query)}&limit=${limit}`);
+}
+
 export async function fetchCourseDescription(prefix, number) {
   try {
     return await fetchJSON(`/api/courses/${prefix}/${number}/description`);
@@ -49,8 +54,8 @@ export async function fetchDegrees(year) {
   return fetchJSON(`/api/degrees${params}`);
 }
 
-export async function fetchDegreeRequirements(degreeName, acadUnitId) {
-  const params = new URLSearchParams({ name: degreeName });
+export async function fetchDegreeRequirements(degreeName, acadUnitId, type = 'degree') {
+  const params = new URLSearchParams({ name: degreeName, type });
   if (acadUnitId) params.append('acadUnitId', acadUnitId);
   return fetchJSON(`/api/degree-requirements?${params}`);
 }

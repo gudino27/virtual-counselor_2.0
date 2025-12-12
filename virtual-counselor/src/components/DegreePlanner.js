@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import ClassGradeCalculator from './ClassGradeCalculator';
 import ExcelJS from 'exceljs';
-import { fetchDegrees, fetchDegreeRequirements, searchCourses } from '../utils/api';
+import { fetchDegrees, fetchDegreeRequirements } from '../utils/api';
 import { detectElectiveKinds, buildElectiveFilter, computeUcoreSatisfaction } from '../utils/courseHelpers';
 import { saveUcoreCache, loadUcoreCache, saveDegreePlan, loadDegreePlan, clearAllData } from '../utils/storage';
-
-const GRADE_POINTS = {
-  'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
-  'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0, 'P': 0.0
-};
+import { GRADE_POINTS } from './degree-planner/CourseRow';
+import YearSection from './degree-planner/YearSection';
+import OptimizeModal from './degree-planner/OptimizeModal';
+import GradeScaleModal from './degree-planner/GradeScaleModal';
+import CatalogModal from './degree-planner/CatalogModal';
+import DegreeSelector from './degree-planner/DegreeSelector';
 
 function DegreePlanner() {
   // State management
@@ -17,6 +19,8 @@ function DegreePlanner() {
   const [degrees, setDegrees] = useState([]);
   const [degreeSearch, setDegreeSearch] = useState('');
   const [showDegreeSuggestions, setShowDegreeSuggestions] = useState(false);
+  const [degreeSortBy, setDegreeSortBy] = useState('name-asc'); // 'name-asc', 'name-desc', 'type'
+  const [degreeFilterType, setDegreeFilterType] = useState('all'); // 'all', 'major', 'minor', 'certificate'
   const [selectedPrograms, setSelectedPrograms] = useState({ majors: [], minors: [], certificates: [] });
   const [years, setYears] = useState([
     { id: 1, name: 'Year 1' },
@@ -51,6 +55,7 @@ function DegreePlanner() {
   // UCORE course cache for instant modal loading
   const [ucoreCourseCache, setUcoreCourseCache] = useState(null); // { [category]: Course[] }
   const [ucoreCacheLoaded, setUcoreCacheLoaded] = useState(false);
+  const [ucoreCacheYear, setUcoreCacheYear] = useState(null);
   const [allowedUcoreCategories, setAllowedUcoreCategories] = useState([]); // Categories from footnotes
   const [hydrated, setHydrated] = useState(false);
 
@@ -98,18 +103,24 @@ function DegreePlanner() {
       : (course.footnotes || '');
     // All UCORE categories except CAPS
     const allCategories = ['WRTG', 'QUAN', 'BSCI', 'PSCI', 'HUM', 'ARTS', 'DIVR', 'ROOT', 'COMM', 'EQJS', 'SSCI'];
-    return allCategories.filter(cat => footnotes.toUpperCase().includes(cat));
+    const foundCategories = allCategories.filter(cat => footnotes.toUpperCase().includes(cat));
+    // If no specific categories found in footnotes, return all categories for UCORE Inquiry courses
+    return foundCategories.length > 0 ? foundCategories : allCategories;
   };
 
   // Pre-fetch all UCORE courses (except CAPS) for instant modal loading
   const prefetchUcoreCourses = async (year) => {
-    if (ucoreCacheLoaded || !year) return;
+    if (!year) return;
 
-    // Try to load from localStorage first
+    // If cache already loaded for this same year, skip
+    if (ucoreCacheLoaded && ucoreCacheYear === year) return;
+
+    // Try to load from localStorage first (validated by year inside loadUcoreCache)
     const cachedData = loadUcoreCache(year);
     if (cachedData) {
       setUcoreCourseCache(cachedData);
       setUcoreCacheLoaded(true);
+      setUcoreCacheYear(year);
       return;
     }
 
@@ -395,7 +406,10 @@ function DegreePlanner() {
   // Add program
   const handleAddProgram = async (type, name) => {
     try {
-      const data = await fetchDegreeRequirements(name);
+      // Convert plural state key to singular for API call
+      const apiTypeMap = { 'majors': 'major', 'minors': 'minor', 'certificates': 'certificate' };
+      const apiType = apiTypeMap[type] || type;
+      const data = await fetchDegreeRequirements(name, null, apiType);
       console.log('fetchDegreeRequirements result for', name, data);
       
       setSelectedPrograms(prev => ({
@@ -479,8 +493,17 @@ function DegreePlanner() {
       }
     } catch (error) {
       console.error('Error adding program:', error);
-      alert('Error loading program requirements');
+      toast.error('Error loading program requirements');
     }
+  };
+
+  // Remove a program (major, minor, or certificate)
+  const handleRemoveProgram = (type, name) => {
+    setSelectedPrograms(prev => ({
+      ...prev,
+      [type]: prev[type].filter(p => p.name !== name)
+    }));
+    toast.success(`Removed ${name}`);
   };
 
   // Optimize schedule
@@ -824,7 +847,7 @@ function DegreePlanner() {
     setShowCatalogModal(true);
   };
 
-  const openCatalogForCourse = (courseId, yearId, termName) => {
+  const openCatalogForCourse = async (courseId, yearId, termName) => {
     const target = { courseId, yearId, term: termName };
     setCatalogTarget(target);
     setCatalogModalYear(selectedYear || (catalogYears[0] || ''));
@@ -863,31 +886,65 @@ function DegreePlanner() {
         const reqCredits = deriveRequiredCredits(courseObj);
         setUcoreRemainingCredits(reqCredits);
 
-        // Check if this is a UCORE Inquiry course and use cached data if available
-        if (isUcoreInquiry(courseObj) && ucoreCacheLoaded && ucoreCourseCache) {
+        // Check if this is a UCORE Inquiry course
+        if (isUcoreInquiry(courseObj)) {
           // Get allowed categories from this course's footnotes
           const allowedCats = extractAllowedUcoreCategories(courseObj);
           setAllowedUcoreCategories(allowedCats);
 
-          // Filter cached courses to only include allowed categories
-          const relevantCourses = allowedCats.flatMap(cat =>
-            (ucoreCourseCache[cat] || []).map(c => ({ ...c, _ucoreMatches: [cat] }))
-          );
+          // Try to use cached data first
+          if (ucoreCacheLoaded && ucoreCourseCache) {
+            // Filter cached courses to only include allowed categories
+            const relevantCourses = allowedCats.flatMap(cat =>
+              (ucoreCourseCache[cat] || []).map(c => ({ ...c, _ucoreMatches: [cat] }))
+            );
 
-          // Deduplicate by course code, merge _ucoreMatches
-          const courseMap = new Map();
-          for (const c of relevantCourses) {
-            const key = c.code || `${c.prefix} ${c.number}`;
-            if (courseMap.has(key)) {
-              const existing = courseMap.get(key);
-              existing._ucoreMatches = [...new Set([...existing._ucoreMatches, ...c._ucoreMatches])];
-            } else {
-              courseMap.set(key, { ...c });
+            // Deduplicate by course code, merge _ucoreMatches
+            const courseMap = new Map();
+            for (const c of relevantCourses) {
+              const key = c.code || `${c.prefix} ${c.number}`;
+              if (courseMap.has(key)) {
+                const existing = courseMap.get(key);
+                existing._ucoreMatches = [...new Set([...existing._ucoreMatches, ...c._ucoreMatches])];
+              } else {
+                courseMap.set(key, { ...c });
+              }
             }
+
+            setCatalogResults(Array.from(courseMap.values()));
+            return; // Skip API fetch - use cached data
           }
 
-          setCatalogResults(Array.from(courseMap.values()));
-          return; // Skip API fetch - use cached data
+          // Fallback: Fetch UCORE courses directly from API if cache not available
+          console.log('[DegreePlanner] UCORE cache not loaded, fetching directly for categories:', allowedCats);
+          try {
+            const courseMap = new Map();
+            const year = catalogModalYear || selectedYear;
+            for (const cat of allowedCats) {
+              const params = new URLSearchParams();
+              if (year) params.append('year', year);
+              params.append('ucore', cat);
+              params.append('limit', '200');
+              const resp = await fetch(`/api/catalog/courses?${params.toString()}`);
+              if (resp.ok) {
+                const data = await resp.json();
+                for (const c of (data.courses || [])) {
+                  const key = c.code || `${c.prefix} ${c.number}`;
+                  if (courseMap.has(key)) {
+                    const existing = courseMap.get(key);
+                    existing._ucoreMatches = [...new Set([...(existing._ucoreMatches || []), cat])];
+                  } else {
+                    courseMap.set(key, { ...c, _ucoreMatches: [cat] });
+                  }
+                }
+              }
+            }
+            setCatalogResults(Array.from(courseMap.values()));
+          } catch (e) {
+            console.error('[DegreePlanner] Error fetching UCORE courses:', e);
+            setCatalogResults([]);
+          }
+          return;
         }
 
         // Clear allowed categories for non-UCORE courses
@@ -1965,7 +2022,7 @@ function DegreePlanner() {
             if (parsed.years) setYears(parsed.years);
             setDegreePlan(parsed.plan || {});
             setSelectedPrograms(parsed.programs || { majors: [], minors: [], certificates: [] });
-            alert('Import successful (restored from hidden backup).');
+            toast.success('Import successful (restored from hidden backup).');
             return;
           }
         } catch (e) {
@@ -2044,10 +2101,10 @@ function DegreePlanner() {
       });
 
       setDegreePlan(newPlan);
-      alert('Import successful (legacy parsing).');
+      toast.success('Import successful (legacy parsing).');
     } catch (error) {
       console.error('Import error:', error);
-      alert('Error importing file. Please check format.');
+      toast.error('Error importing file. Please check format.');
     }
   };
 
@@ -2192,46 +2249,8 @@ function DegreePlanner() {
         </div>
       </div>
 
-      {/* Grade Scale Modal (overlay) */}
-      {showGradeScale && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          role="dialog"
-          aria-modal="true"
-          aria-label="WSU Grade Scale"
-          onClick={() => setShowGradeScale(false)}
-        >
-          <div className="absolute inset-0 bg-black bg-opacity-40" />
-          <div
-            className="relative z-10 w-full max-w-md mx-4 bg-white rounded-lg shadow-lg overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h3 className="font-semibold text-lg">WSU Grade Scale</h3>
-              <button
-                onClick={() => setShowGradeScale(false)}
-                className="text-gray-600 hover:text-gray-800 rounded p-1"
-                aria-label="Close grade scale"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-4">
-              <p className="text-sm text-gray-700 mb-3">This shows the standard grade-to-point mapping used for GPA calculations.</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
-                {Object.entries(GRADE_POINTS).map(([grade, points]) => (
-                  <div key={grade} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
-                    <div className="font-medium">{grade}</div>
-                    <div className="text-gray-600">{points.toFixed(1)}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 text-xs text-gray-500">Tip: press <span className="font-medium">Esc</span> or tap outside to close.</div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Grade Scale Modal */}
+      <GradeScaleModal show={showGradeScale} onClose={() => setShowGradeScale(false)} />
 
       {/* Class Grade Calculator modal (opened per-course) */}
       {showClassCalc && (
@@ -2242,300 +2261,56 @@ function DegreePlanner() {
       )}
 
         {/* Catalog Course Picker Modal */}
-        {showCatalogModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto">
-              <div className="flex items-start justify-between">
-                <h3 className="text-xl font-bold">Select Courses (Catalog)</h3>
-                <button onClick={() => { setShowCatalogModal(false); setAllowedUcoreCategories([]); setCatalogUcoreSelected(null); }} className="text-gray-600">Close</button>
-              </div>
-
-              {/* Show UCORE satisfaction summary when available from elective queries */}
-              {catalogResults && catalogResults[0] && catalogResults[0]._ucoreSummary && (
-                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-100 rounded text-sm text-yellow-800">
-                  <strong>UCORE status:</strong>
-                  {(() => {
-                    const s = catalogResults[0]._ucoreSummary;
-                    if (!s) return null;
-                    if (s.remaining && s.remaining.length === 0) return <span> All required categories satisfied by your plan.</span>;
-                    return <span> Remaining: {s.remaining.join(', ')}</span>;
-                  })()}
-                </div>
-              )}
-
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {/* Input area: three modes
-                    1) UCORE-aggregated results -> show client-side search + UCORE category buttons
-                    2) Footnote-driven (prefix/number) -> hide search, show note
-                    3) Normal search -> server-backed search input + year/term
-                */}
-                {isUcoreAggregated ? (
-                  <>
-                    <div className="col-span-2">
-                      <input
-                        type="text"
-                        placeholder="Filter results (client-side): code, title, description..."
-                        value={catalogClientSearch}
-                        onChange={(e) => setCatalogClientSearch(e.target.value)}
-                        className="w-full px-3 py-2 border rounded"
-                      />
-                      {/* UCORE category buttons */}
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {availableUcoreCats.map(cat => (
-                          <button
-                            key={cat}
-                            onClick={() => setCatalogUcoreSelected(prev => prev === cat ? null : cat)}
-                            className={`px-2 py-1 text-sm rounded border ${catalogUcoreSelected === cat ? 'bg-wsu-crimson text-white' : 'bg-white'}`}
-                            title={`Show courses that satisfy ${cat}`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                        {availableUcoreCats.length === 0 && (
-                          <div className="text-sm text-gray-500">No UCORE categories detected.</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <select value={catalogModalYear} onChange={e => setCatalogModalYear(e.target.value)} className="px-3 py-2 border rounded">
-                        {(catalogYears || []).map(y => <option key={y} value={y}>{y}</option>)}
-                      </select>
-                      <select value={catalogModalTerm} onChange={e => setCatalogModalTerm(e.target.value)} className="px-3 py-2 border rounded">
-                        <option value="fall">Fall</option>
-                        <option value="spring">Spring</option>
-                        <option value="summer">Summer</option>
-                      </select>
-                      <button className="px-3 py-2 bg-gray-200 text-gray-700 rounded" title="Client-side filter only">Filter</button>
-                    </div>
-                  </>
-                ) : (catalogTarget && catalogResults.length > 0 && catalogResults[0] && catalogResults[0]._disabledForFootnote !== undefined) ? (
-                  <div className="col-span-3">
-                    <div className="text-sm text-gray-700">Showing options from the selected course's footnotes. Use these choices to fill the placeholder. Changing year/term will refresh availability.</div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="col-span-2">
-                      <input
-                        type="text"
-                        placeholder="Search catalog (title, code, description...)"
-                        value={catalogSearch}
-                        onChange={(e) => setCatalogSearch(e.target.value)}
-                        className="w-full px-3 py-2 border rounded"
-                      />
-                    </div>
-                    <div className="flex space-x-2">
-                      <select value={catalogModalYear} onChange={e => setCatalogModalYear(e.target.value)} className="px-3 py-2 border rounded">
-                        {(catalogYears || []).map(y => <option key={y} value={y}>{y}</option>)}
-                      </select>
-                      <select value={catalogModalTerm} onChange={e => setCatalogModalTerm(e.target.value)} className="px-3 py-2 border rounded">
-                        <option value="fall">Fall</option>
-                        <option value="spring">Spring</option>
-                        <option value="summer">Summer</option>
-                      </select>
-                      <button onClick={() => fetchCatalogCandidates(catalogSearch)} className="px-3 py-2 bg-wsu-crimson text-white rounded">Search</button>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="mt-4">
-                <div className="text-sm text-gray-600 mb-2">Select a course to add it to your plan. Check campus availability — offerings may vary by campus/term.</div>
-                <div className="space-y-3">
-                  {catalogResults.length === 0 && (
-                    <div className="text-sm text-gray-500">No results. Try a broader search or change year.</div>
-                  )}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">View:</label>
-                      <button onClick={() => { setCatalogViewMode('list'); setCatalogIndex(0); }} className={`px-2 py-1 text-sm rounded ${catalogViewMode==='list' ? 'bg-gray-200' : 'bg-white'}`}>List</button>
-                      <button onClick={() => { setCatalogViewMode('carousel'); setCatalogIndex(0); }} className={`px-2 py-1 text-sm rounded ${catalogViewMode==='carousel' ? 'bg-gray-200' : 'bg-white'}`}>Carousel</button>
-                    </div>
-                    {catalogViewMode === 'carousel' && catalogResults.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => setCatalogIndex(i => { const nxt = (i - 1 + filteredCatalogResults.length) % Math.max(1, filteredCatalogResults.length); return nxt; })} className="px-2 py-1 bg-white rounded border">Prev</button>
-                        <div className="text-sm text-gray-600">{catalogIndex + 1} / {filteredCatalogResults.length}</div>
-                        <button onClick={() => setCatalogIndex(i => { const nxt = (i + 1) % Math.max(1, filteredCatalogResults.length); return nxt; })} className="px-2 py-1 bg-white rounded border">Next</button>
-                        {isUcoreAggregated && (
-                          <div className="ml-4 flex items-center gap-2">
-                            <div className="text-sm text-gray-700">Remaining: <strong>{ucoreRemainingCredits}</strong> cr</div>
-                            <button onClick={autoFillUcore} className="px-2 py-1 bg-gray-100 rounded border text-sm">Auto-fill</button>
-                            <button onClick={() => { setCatalogTarget(null); setCatalogTargetCourse(null); setShowCatalogModal(false); setAllowedUcoreCategories([]); setCatalogUcoreSelected(null); }} className="px-2 py-1 bg-white rounded border text-sm">Done</button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {catalogViewMode === 'carousel' ? (
-                    filteredCatalogResults[catalogIndex] ? (
-                        (() => {
-                          const c = filteredCatalogResults[catalogIndex];
-                        return (
-                          <div key={`${c.id || 'noid'}-${catalogIndex}`} className="border rounded p-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <div className="text-sm font-semibold">{c.code || (c.prefix + ' ' + c.number)} — {c.title}</div>
-                                <div className="text-xs text-gray-600">Credits: {c.credits || c.credits_phrase || '—'}</div>
-                                {c._satisfiesUcore && (
-                                  <div className="mt-1 text-xs text-green-700 font-medium">Satisfies required UCORE</div>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <div className="text-xs text-gray-500">Availability:</div>
-                                <div className="text-sm">{(c.availability && c.availability.length) ? c.availability.slice(0,3).map(a=>`${a.campus || ''} ${a.term || ''} ${a.year || ''}`).join(', ') : 'Not listed in live schedule'}</div>
-                              </div>
-                            </div>
-                            <div className="mt-2 text-sm text-gray-700">{c.description ? (c.description.length > 400 ? c.description.slice(0,400)+'…' : c.description) : 'No description available'}</div>
-                            <div className="mt-3 flex items-center justify-end space-x-2">
-                              <button
-                                onClick={() => addCatalogCourseToPlan(c, activeYearTab, catalogModalTerm)}
-                                className={`px-3 py-1 rounded ${c._disabledForFootnote ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                                disabled={!!c._disabledForFootnote}
-                                title={c._disabledForFootnote ? 'Already selected for this footnote group' : `Add to ${years.find(y=>y.id===activeYearTab)?.name} ${catalogModalTerm}`}
-                              >
-                                Add to {years.find(y=>y.id===activeYearTab)?.name} {catalogModalTerm}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : null
-                  ) : (
-                    filteredCatalogResults.map((c, idx) => (
-                      <div key={`${c.id || 'noid'}-${idx}`} className="border rounded p-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="text-sm font-semibold">{c.code || (c.prefix + ' ' + c.number)} — {c.title}</div>
-                            <div className="text-xs text-gray-600">Credits: {c.credits || c.credits_phrase || '—'}</div>
-                            {c._satisfiesUcore && (
-                              <div className="mt-1 text-xs text-green-700 font-medium">Satisfies required UCORE</div>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className="text-xs text-gray-500">Availability:</div>
-                            <div className="text-sm">{(c.availability && c.availability.length) ? c.availability.slice(0,3).map(a=>`${a.campus || ''} ${a.term || ''} ${a.year || ''}`).join(', ') : 'Not listed in live schedule'}</div>
-                          </div>
-                        </div>
-                        <div className="mt-2 text-sm text-gray-700">{c.description ? (c.description.length > 400 ? c.description.slice(0,400)+'…' : c.description) : 'No description available'}</div>
-                        <div className="mt-3 flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => addCatalogCourseToPlan(c, activeYearTab, catalogModalTerm)}
-                            className={`px-3 py-1 rounded ${c._disabledForFootnote ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                            disabled={!!c._disabledForFootnote}
-                            title={c._disabledForFootnote ? 'Already selected for this footnote group' : `Add to ${years.find(y=>y.id===activeYearTab)?.name} ${catalogModalTerm}`}
-                          >
-                            Add to {years.find(y=>y.id===activeYearTab)?.name} {catalogModalTerm}
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <CatalogModal
+          show={showCatalogModal}
+          onClose={() => { setShowCatalogModal(false); setAllowedUcoreCategories([]); setCatalogUcoreSelected(null); setCatalogTarget(null); setCatalogTargetCourse(null); }}
+          catalogResults={catalogResults}
+          filteredCatalogResults={filteredCatalogResults}
+          isUcoreAggregated={isUcoreAggregated}
+          catalogSearch={catalogSearch}
+          setCatalogSearch={setCatalogSearch}
+          catalogClientSearch={catalogClientSearch}
+          setCatalogClientSearch={setCatalogClientSearch}
+          catalogYears={catalogYears}
+          catalogModalYear={catalogModalYear}
+          setCatalogModalYear={setCatalogModalYear}
+          catalogModalTerm={catalogModalTerm}
+          setCatalogModalTerm={setCatalogModalTerm}
+          availableUcoreCats={availableUcoreCats}
+          catalogUcoreSelected={catalogUcoreSelected}
+          setCatalogUcoreSelected={setCatalogUcoreSelected}
+          ucoreRemainingCredits={ucoreRemainingCredits}
+          catalogViewMode={catalogViewMode}
+          setCatalogViewMode={setCatalogViewMode}
+          catalogIndex={catalogIndex}
+          setCatalogIndex={setCatalogIndex}
+          catalogTarget={catalogTarget}
+          fetchCatalogCandidates={fetchCatalogCandidates}
+          addCatalogCourseToPlan={addCatalogCourseToPlan}
+          autoFillUcore={autoFillUcore}
+          years={years}
+          activeYearTab={activeYearTab}
+        />
 
       {/* Degree Selection */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Select Degree Program</h3>
-        
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Catalog Year</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
-            >
-              {catalogYears.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
-          <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search Programs</label>
-            <input
-              ref={degreeInputRef}
-              type="text"
-              value={degreeSearch}
-              onChange={(e) => {
-                setDegreeSearch(e.target.value);
-                setShowDegreeSuggestions(true);
-              }}
-              onFocus={() => setShowDegreeSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowDegreeSuggestions(false), 200)}
-              placeholder="Type to search majors, minors, certificates..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
-            />
-            
-            {/* Suggestions Dropdown */}
-            {showDegreeSuggestions && degreeSearch.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                {degrees
-                  .filter(d => d.name.toLowerCase().includes(degreeSearch.toLowerCase()))
-                  .slice(0, 20)
-                  .map(d => (
-                    <button
-                      key={d.id}
-                      onClick={() => {
-                        const typeMap = {
-                          'major': 'majors',
-                          'minor': 'minors',
-                          'certificate': 'certificates'
-                        };
-                        const programType = typeMap[d.degree_type] || 'majors';
-                        handleAddProgram(programType, d.name);
-                        setDegreeSearch('');
-                        setShowDegreeSuggestions(false);
-                      }}
-                      className="w-full px-3 py-2 text-left hover:bg-gray-100 flex items-center justify-between"
-                    >
-                      <span className="text-sm">{d.name}</span>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        d.degree_type === 'major' ? 'bg-blue-100 text-blue-800' :
-                        d.degree_type === 'minor' ? 'bg-green-100 text-green-800' :
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {d.degree_type === 'major' ? 'Major' :
-                         d.degree_type === 'minor' ? 'Minor' : 'Certificate'}
-                      </span>
-                    </button>
-                  ))}
-                {degrees.filter(d => d.name.toLowerCase().includes(degreeSearch.toLowerCase())).length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-500">No results found</div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Selected Programs */}
-        {[...selectedPrograms.majors, ...selectedPrograms.minors, ...selectedPrograms.certificates].length > 0 && (
-          <div className="mt-4 space-y-3">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Programs:</h4>
-            <div className="space-y-2">
-              {[...selectedPrograms.majors, ...selectedPrograms.minors, ...selectedPrograms.certificates].map((prog, idx) => (
-                <div key={idx} className="border border-gray-200 rounded-lg">
-                  <div className="px-3 py-2 bg-wsu-crimson text-white rounded-t-lg font-medium text-sm">
-                    {prog.name}
-                  </div>
-                  {prog.data?.degree?.narrative && (
-                    <details className="px-3 py-2 bg-gray-50">
-                      <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-wsu-crimson">
-                        📋 Degree Information & Requirements
-                      </summary>
-                      <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-                        {prog.data.degree.narrative}
-                      </div>
-                    </details>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <DegreeSelector
+        catalogYears={catalogYears}
+        selectedYear={selectedYear}
+        setSelectedYear={setSelectedYear}
+        degreeFilterType={degreeFilterType}
+        setDegreeFilterType={setDegreeFilterType}
+        degreeSortBy={degreeSortBy}
+        setDegreeSortBy={setDegreeSortBy}
+        degreeSearch={degreeSearch}
+        setDegreeSearch={setDegreeSearch}
+        showDegreeSuggestions={showDegreeSuggestions}
+        setShowDegreeSuggestions={setShowDegreeSuggestions}
+        degreeInputRef={degreeInputRef}
+        degrees={degrees}
+        selectedPrograms={selectedPrograms}
+        handleAddProgram={handleAddProgram}
+        handleRemoveProgram={handleRemoveProgram}
+      />
 
       {/* Year Tabs */}
       <div className="bg-white rounded-lg shadow">
@@ -2601,592 +2376,13 @@ function DegreePlanner() {
       </div>
 
       {/* Optimize Modal */}
-      {showOptimizeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold mb-4">Optimize Schedule</h3>
-            <div className="space-y-3">
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="radio"
-                  name="speed"
-                  value="accelerated"
-                  checked={optimizeSpeed === 'accelerated'}
-                  onChange={(e) => setOptimizeSpeed(e.target.value)}
-                  className="w-4 h-4"
-                />
-                <span>Accelerated (23 credits/semester)</span>
-              </label>
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="radio"
-                  name="speed"
-                  value="normal"
-                  checked={optimizeSpeed === 'normal'}
-                  onChange={(e) => setOptimizeSpeed(e.target.value)}
-                  className="w-4 h-4"
-                />
-                <span>Normal (15-18 credits/semester)</span>
-              </label>
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="radio"
-                  name="speed"
-                  value="relaxed"
-                  checked={optimizeSpeed === 'relaxed'}
-                  onChange={(e) => setOptimizeSpeed(e.target.value)}
-                  className="w-4 h-4"
-                />
-                <span>Relaxed (12 credits/semester minimum)</span>
-              </label>
-            </div>
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={handleOptimize}
-                className="flex-1 px-4 py-2 bg-wsu-crimson text-white rounded-lg hover:bg-red-800"
-              >
-                Optimize
-              </button>
-              <button
-                onClick={() => setShowOptimizeModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-  // Year Section Component
-function YearSection({ year, degreePlan, setDegreePlan, onDeleteYear, canDelete, hideHeader, openCatalogForCourse, openClassCalc, activeTermTab, setActiveTermTab }) {
-  const [expanded, setExpanded] = useState(true);
-
-  const yearData = degreePlan[year.id] || { fall: { courses: [] }, spring: { courses: [] }, summer: { courses: [] } };
-
-  const termNames = [
-    { key: 'fall', label: 'Fall' },
-    { key: 'spring', label: 'Spring' },
-    { key: 'summer', label: 'Summer' }
-  ];
-
-  return (
-    <div className={hideHeader ? '' : 'bg-white rounded-lg shadow'}>
-      {!hideHeader && (
-        <div className="flex items-center justify-between p-4 border-b">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center space-x-2 font-semibold text-lg"
-          >
-            <svg
-              className={`w-5 h-5 transition-transform ${expanded ? 'transform rotate-90' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <span>{year.name}</span>
-          </button>
-          {canDelete && (
-            <button
-              onClick={onDeleteYear}
-              className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition"
-            >
-              Delete Year
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Mobile Term Tabs (visible only on small screens) */}
-      <div className="md:hidden px-4 pt-3">
-        <div className="flex bg-gray-50 rounded-lg overflow-hidden">
-          {termNames.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setActiveTermTab(t.key)}
-              className={`mobile-tab ${activeTermTab === t.key ? 'mobile-tab-active' : 'mobile-tab-inactive'}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {(hideHeader || expanded) && (
-        <>
-          {/* Desktop: three columns */}
-          <div className="hidden md:grid md:grid-cols-3 md:gap-4 p-4">
-            <TermCard
-              title="Fall"
-              term="fall"
-              yearId={year.id}
-              courses={yearData.fall.courses}
-              degreePlan={degreePlan}
-              setDegreePlan={setDegreePlan}
-              openCatalogForCourse={openCatalogForCourse}
-              openClassCalc={openClassCalc}
-            />
-            <TermCard
-              title="Spring"
-              term="spring"
-              yearId={year.id}
-              courses={yearData.spring.courses}
-              degreePlan={degreePlan}
-              setDegreePlan={setDegreePlan}
-              openCatalogForCourse={openCatalogForCourse}
-              openClassCalc={openClassCalc}
-            />
-            <TermCard
-              title="Summer"
-              term="summer"
-              yearId={year.id}
-              courses={yearData.summer.courses}
-              degreePlan={degreePlan}
-              setDegreePlan={setDegreePlan}
-              openCatalogForCourse={openCatalogForCourse}
-              openClassCalc={openClassCalc}
-            />
-          </div>
-
-          {/* Mobile: only show the active term */}
-          <div className="md:hidden px-4">
-            {activeTermTab === 'fall' && (
-              <TermCard
-                title="Fall"
-                term="fall"
-                yearId={year.id}
-                courses={yearData.fall.courses}
-                degreePlan={degreePlan}
-                setDegreePlan={setDegreePlan}
-                openCatalogForCourse={openCatalogForCourse}
-                openClassCalc={openClassCalc}
-              />
-            )}
-            {activeTermTab === 'spring' && (
-              <TermCard
-                title="Spring"
-                term="spring"
-                yearId={year.id}
-                courses={yearData.spring.courses}
-                degreePlan={degreePlan}
-                setDegreePlan={setDegreePlan}
-                openCatalogForCourse={openCatalogForCourse}
-                openClassCalc={openClassCalc}
-              />
-            )}
-            {activeTermTab === 'summer' && (
-              <TermCard
-                title="Summer"
-                term="summer"
-                yearId={year.id}
-                courses={yearData.summer.courses}
-                degreePlan={degreePlan}
-                setDegreePlan={setDegreePlan}
-                openCatalogForCourse={openCatalogForCourse}
-                openClassCalc={openClassCalc}
-              />
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// Term Card Component
-function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, openCatalogForCourse, openClassCalc }) {
-  const totalCredits = courses.reduce((sum, c) => sum + (c.credits || 0), 0);
-  
-  const calculateTermGPA = () => {
-    let points = 0;
-    let credits = 0;
-    courses.forEach(c => {
-      if (c.status === 'taken' && c.grade) {
-        points += (GRADE_POINTS[c.grade] || 0) * c.credits;
-        credits += c.credits;
-      }
-    });
-    return credits > 0 ? (points / credits).toFixed(2) : '—';
-  };
-
-  const addCourse = () => {
-    const newCourse = {
-      id: Date.now(),
-      name: '',
-      credits: 0,
-      grade: '',
-      status: 'not-taken'
-    };
-    
-    setDegreePlan(prev => ({
-      ...prev,
-      [yearId]: {
-        ...prev[yearId],
-        [term]: {
-          courses: [...prev[yearId][term].courses, newCourse]
-        }
-      }
-    }));
-  };
-
-  const updateCourse = (courseId, field, value) => {
-    setDegreePlan(prev => ({
-      ...prev,
-      [yearId]: {
-        ...prev[yearId],
-        [term]: {
-          courses: prev[yearId][term].courses.map(c =>
-            c.id === courseId ? { ...c, [field]: value } : c
-          )
-        }
-      }
-    }));
-  };
-
-  const removeCourse = (courseId) => {
-    setDegreePlan(prev => ({
-      ...prev,
-      [yearId]: {
-        ...prev[yearId],
-        [term]: {
-          courses: prev[yearId][term].courses.filter(c => c.id !== courseId)
-        }
-      }
-    }));
-  };
-
-  const enrollmentStatus = totalCredits >= 12 ? 'Full-Time' : 'Part-Time';
-  const statusColor = totalCredits >= 12 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
-
-  return (
-    <div className="border border-gray-200 rounded-lg p-4">
-      <div className="flex justify-between items-center mb-3">
-        <h4 className="font-semibold">{title}</h4>
-        <span className={`px-2 py-1 rounded text-xs font-medium ${statusColor}`}>
-          {enrollmentStatus}
-        </span>
-      </div>
-      
-      <div className="text-sm text-gray-600 mb-3">
-        {totalCredits} credits
-        {totalCredits > 23 && (
-          <div className="text-xs text-orange-600 mt-1">⚠️ Advisor approval required</div>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        {courses.map((course, idx) => (
-          <CourseRow
-            key={`${course.id || 'noid'}-${idx}`}
-            course={course}
-            onUpdate={updateCourse}
-            onRemove={removeCourse}
-            yearId={yearId}
-            term={term}
-            openCatalog={openCatalogForCourse}
-            openClassCalc={openClassCalc}
-          />
-        ))}
-      </div>
-
-      <button
-        onClick={addCourse}
-        className="w-full mt-3 py-2 text-sm border-2 border-dashed border-gray-300 rounded text-gray-600 hover:border-wsu-crimson hover:text-wsu-crimson transition"
-      >
-        + Add Course
-      </button>
-
-      <div className="mt-3 pt-3 border-t text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Term GPA:</span>
-          <span className="font-semibold">{calculateTermGPA()}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Course Row Component with autocomplete
-function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog, openClassCalc }) {
-  const textareaRef = useRef(null);
-  const [courseSuggestions, setCourseSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [expandedCourse, setExpandedCourse] = useState(null);
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-    }
-  }, [course.name]);
-
-  const handleCourseSearch = async (value) => {
-    onUpdate(course.id, 'name', value);
-    
-    if (value.length > 1) {
-      try {
-        const data = await searchCourses(value, 10);
-        // Group courses by prefix + number
-        const grouped = {};
-        (data.courses || []).forEach(c => {
-          const key = `${c.coursePrefix} ${c.courseNumber}`;
-          if (!grouped[key]) {
-            grouped[key] = {
-              key,
-              course: c,
-              sections: []
-            };
-          }
-          grouped[key].sections.push(c);
-        });
-        // Limit suggestions on mobile to avoid pushing other layout elements down
-        let results = Object.values(grouped);
-        try {
-          const isMobile = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
-          const maxItems = isMobile ? 5 : 20;
-          results = results.slice(0, maxItems);
-        } catch (e) {
-          // ignore and fall back to full list
-        }
-        setCourseSuggestions(results);
-        setShowSuggestions(true);
-      } catch (error) {
-        console.error('Error searching courses:', error);
-      }
-    } else {
-      setShowSuggestions(false);
-    }
-  };
-
-  const selectCourse = (courseData) => {
-    onUpdate(course.id, 'name', `${courseData.coursePrefix} ${courseData.courseNumber}`);
-    onUpdate(course.id, 'credits', parseInt(courseData.credits) || 0);
-    setShowSuggestions(false);
-    setExpandedCourse(null);
-  };
-
-  // Determine whether this row is a placeholder/elective that should show the catalog Select button.
-  const hasCourseCode = (name) => {
-    if (!name) return false;
-    return /\b[A-Za-z]{2,6}\s*\.?\s*\d{3}\b/.test(name);
-  };
-
-  const isPlaceholderRow = () => {
-    const nm = String(course.name || '');
-    if (!nm.trim()) return true;
-    // obvious elective/requirement tokens
-    if (/elective|requirement|u-?core/i.test(nm)) return true;
-    // if the name is just a bracketed attribute (e.g., "[WRTG]") treat as placeholder
-    if (/^\s*\[.*\]\s*$/.test(nm) && !hasCourseCode(nm)) return true;
-    return false;
-  };
-
-  return (
-    <div className="space-y-2 group relative">
-      <div className="flex gap-2 items-start">
-        <div className="flex-1 relative">
-          <textarea
-            ref={textareaRef}
-            value={course.name}
-            onChange={(e) => handleCourseSearch(e.target.value)}
-            onFocus={() => course.name.length > 1 && setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            placeholder="Type course name (e.g., CPTS 121)"
-            rows={1}
-            className="w-full px-2 py-1 text-sm border border-gray-300 rounded resize-none overflow-hidden focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
-          />
-          
-          {/* Course Suggestions Dropdown */}
-          {showSuggestions && courseSuggestions.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-44 md:max-h-60 overflow-y-auto">
-              {courseSuggestions.map(({ key, course: c, sections }) => (
-                <div key={key} className="border-b border-gray-200 last:border-b-0">
-                  <button
-                    onClick={() => {
-                      if (sections.length === 1) {
-                        selectCourse(sections[0]);
-                      } else {
-                        setExpandedCourse(expandedCourse === key ? null : key);
-                      }
-                    }}
-                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex justify-between items-center"
-                  >
-                    <div>
-                      <div className="font-medium text-sm">
-                        {c.coursePrefix} {c.courseNumber}
-                      </div>
-                      <div className="text-xs text-gray-600 truncate">{c.title}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">{sections.length} section{sections.length > 1 ? 's' : ''}</span>
-                      {sections.length > 1 && (
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                  
-                  {/* Expanded Sections */}
-                  {expandedCourse === key && sections.length > 1 && (
-                    <div className="bg-gray-50 px-3 py-2 space-y-1">
-                      {sections.map(section => (
-                        <button
-                          key={section.uniqueId}
-                          onClick={() => selectCourse(section)}
-                          className="w-full text-left px-2 py-1 text-xs hover:bg-white rounded"
-                        >
-                          <div className="flex justify-between">
-                            <span className="font-medium">Section {section.sectionNumber}</span>
-                            <span className="text-gray-600">{section.credits} cr</span>
-                          </div>
-                          <div className="text-gray-600">
-                            {section.instructor || 'Staff'} • {section.dayTime || 'ARR'}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {/* Show 'Select' button only for true placeholders (not rows already containing a code like 'ENGL 101 [WRTG]') */}
-          {(!course.catalogCourseId && isPlaceholderRow()) && (
-            <button
-              onClick={() => openCatalog && openCatalog(course.id, yearId, term)}
-              className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-              title="Select course from catalog"
-            >
-              Select
-            </button>
-          )}
-
-          {/* Grade calculator trigger (visible on all sizes) */}
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); console.log('[CourseRow] calc button clicked', course.name); if (openClassCalc) openClassCalc(course.name || 'Course'); else console.warn('openClassCalc is not provided'); }}
-            aria-label="Open grade calculator"
-            title="Open grade calculator"
-            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-          >
-            <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M7 7h10" />
-              <path d="M7 11h4" />
-              <path d="M7 15h4" />
-            </svg>
-            <span className="sr-only">Open grade calculator</span>
-          </button>
-
-          <button
-            onClick={() => onRemove(course.id)}
-            aria-label="Remove course"
-            title="Remove course"
-            className="text-red-600 hover:text-red-800 text-sm px-2 focus:outline-none"
-          >
-            ×
-          </button>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-4 gap-2">
-        <input
-          type="number"
-          value={course.credits || ''}
-          onChange={(e) => onUpdate(course.id, 'credits', parseInt(e.target.value) || 0)}
-          placeholder="Cr"
-          min="0"
-          max="18"
-          className="input-field text-sm"
-        />
-        
-        <select
-          value={course.status || 'not-taken'}
-          onChange={(e) => onUpdate(course.id, 'status', e.target.value)}
-          className="select-field text-sm"
-        >
-          <option value="not-taken">Not Taken</option>
-          <option value="planned">Planned</option>
-          <option value="in-progress">In Progress</option>
-          <option value="taken">Taken</option>
-        </select>
-        
-        <select
-          value={course.grade || ''}
-          onChange={(e) => onUpdate(course.id, 'grade', e.target.value)}
-          disabled={course.status === 'not-taken' || course.status === 'planned'}
-          className="select-field text-sm disabled:bg-gray-100"
-        >
-          <option value="">—</option>
-          {Object.keys(GRADE_POINTS).map(g => (
-            <option key={g} value={g}>{g}</option>
-          ))}
-        </select>
-        
-        <div className="px-2 py-1 text-sm text-gray-600 text-right">
-          {course.grade && course.credits ? ((GRADE_POINTS[course.grade] || 0) * course.credits).toFixed(1) : '—'}
-        </div>
-      </div>
-      {/* Footnotes / Notes for the course - collapsible on mobile */}
-      {((Array.isArray(course.footnotes) && course.footnotes.length > 0) || (course.footnotes && !Array.isArray(course.footnotes))) && (() => {
-        const hasNotes = true;
-        return (
-          <CourseNotes notes={course.footnotes} />
-        );
-      })()}
-    </div>
-  );
-}
-
-// CourseNotes - separates note rendering and includes mobile-first collapsed behavior
-function CourseNotes({ notes }) {
-  const isArray = Array.isArray(notes);
-  const [open, setOpen] = useState(() => {
-    try {
-      if (typeof window !== 'undefined' && window.matchMedia) {
-        // default expanded on md+ (desktop), collapsed on small screens
-        return window.matchMedia('(min-width: 768px)').matches;
-      }
-    } catch (e) {}
-    return false;
-  });
-
-  return (
-    <div className="mt-2">
-      <button
-        onClick={() => setOpen(!open)}
-        className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
-        aria-expanded={open}
-      >
-        <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <span className="font-medium text-sm">Notes</span>
-        <span className="text-xs text-gray-500">{isArray ? notes.length : 1}</span>
-      </button>
-
-      {open && (
-        <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-          <strong className="text-sm text-gray-700">Details:</strong>
-          <div className="mt-1 space-y-1">
-            {isArray
-              ? notes.map((fn, i) => (
-                  <div key={i} className="leading-snug">{fn}</div>
-                ))
-              : <div className="leading-snug">{notes}</div>
-            }
-          </div>
-        </div>
-      )}
+      <OptimizeModal
+        show={showOptimizeModal}
+        onClose={() => setShowOptimizeModal(false)}
+        optimizeSpeed={optimizeSpeed}
+        setOptimizeSpeed={setOptimizeSpeed}
+        onOptimize={handleOptimize}
+      />
     </div>
   );
 }
