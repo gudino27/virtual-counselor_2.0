@@ -350,6 +350,52 @@ function DegreePlanner() {
   const creditsPlanned = calculateCreditsPlanned();
   const creditsRequired = calculateCreditsRequired();
 
+  // Compute list of completed course codes for prerequisite checking
+  const allCompletedCourses = React.useMemo(() => {
+    const completed = [];
+    Object.values(degreePlan).forEach(year => {
+      ['fall', 'spring', 'summer'].forEach(term => {
+        year[term]?.courses.forEach(course => {
+          if (course.status === 'taken' && course.name) {
+            // Extract course code from name (e.g., "CPTS 121" or "CPTS 121 [QUAN]")
+            const match = course.name.match(/^([A-Z]{2,6}\s*\d{3})/i);
+            if (match) {
+              completed.push(match[1].toUpperCase().replace(/\s+/g, ' '));
+            }
+          }
+        });
+      });
+    });
+    return completed;
+  }, [degreePlan]);
+
+  // Detect duplicate courses across the degree plan
+  const duplicateCourses = React.useMemo(() => {
+    const courseOccurrences = {};
+    const duplicates = new Set();
+
+    Object.entries(degreePlan).forEach(([, yearData]) => {
+      ['fall', 'spring', 'summer'].forEach(term => {
+        yearData[term]?.courses.forEach(course => {
+          if (course.name) {
+            // Extract course code
+            const match = course.name.match(/^([A-Z]{2,6}\s*\d{3})/i);
+            if (match) {
+              const code = match[1].toUpperCase().replace(/\s+/g, ' ');
+              if (courseOccurrences[code]) {
+                duplicates.add(code);
+              } else {
+                courseOccurrences[code] = true;
+              }
+            }
+          }
+        });
+      });
+    });
+
+    return duplicates;
+  }, [degreePlan]);
+
   // Progress state: when no programs selected or creditsRequired === 0, show Not Started.
   let progress = 'Not Started';
   const programCount = (selectedPrograms.majors?.length || 0) + (selectedPrograms.minors?.length || 0) + (selectedPrograms.certificates?.length || 0);
@@ -366,7 +412,7 @@ function DegreePlanner() {
     const newId = years.length + 1;
     const newYears = [...years, { id: newId, name: `Year ${newId}` }];
     setYears(newYears);
-    
+
     setDegreePlan(prev => ({
       ...prev,
       [newId]: {
@@ -375,17 +421,21 @@ function DegreePlanner() {
         summer: { courses: [] }
       }
     }));
+    toast.success(`Year ${newId} added`);
   };
 
   const handleDeleteYear = (yearId) => {
-    if (years.length <= 1) return;
-    
+    if (years.length <= 1) {
+      toast.error('Cannot delete the only year');
+      return;
+    }
+
     const newYears = years
       .filter(y => y.id !== yearId)
       .map((y, idx) => ({ id: idx + 1, name: `Year ${idx + 1}` }));
-    
+
     setYears(newYears);
-    
+
     const newPlan = {};
     newYears.forEach((year, idx) => {
       const oldYearData = Object.values(degreePlan)[idx];
@@ -394,13 +444,14 @@ function DegreePlanner() {
       }
     });
     setDegreePlan(newPlan);
-    
+
     // Update active tab if needed
     if (activeYearTab === yearId) {
       setActiveYearTab(1);
     } else if (activeYearTab > yearId) {
       setActiveYearTab(activeYearTab - 1);
     }
+    toast.success(`Year ${yearId} deleted`);
   };
 
   // Add program
@@ -416,6 +467,10 @@ function DegreePlanner() {
         ...prev,
         [type]: [...(prev[type] || []), { name, data }]
       }));
+
+      // Show success toast with program type label
+      const typeLabels = { 'majors': 'Major', 'minors': 'Minor', 'certificates': 'Certificate' };
+      toast.success(`${typeLabels[type] || 'Program'} "${name}" added`);
 
       // Auto-populate courses
       if (data.schedule && Array.isArray(data.schedule)) {
@@ -469,7 +524,8 @@ function DegreePlanner() {
                   footnotes: course.footnotes || [],
                   prefix: course.prefix,
                   number: course.number,
-                  attributes: course.attributes || []
+                  attributes: course.attributes || [],
+                  prerequisites: course.prerequisiteCodes || course.prerequisites || []
                 });
               });
             }
@@ -1994,6 +2050,124 @@ function DegreePlanner() {
     const dateStr = new Date().toISOString().split('T')[0];
     a.download = `wsu-degree-plan-${dateStr}.xlsx`;
     a.click();
+    toast.success('Degree plan exported successfully');
+  };
+
+  // Print/Save as PDF
+  const handlePrintPDF = () => {
+    // Create a print-friendly version of the degree plan
+    const printContent = document.createElement('div');
+    // Build the inner printable content (no footer here - we'll render a fixed footer)
+    printContent.innerHTML = `
+      <style>
+        /* original print styles (scoped inside body) */
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #333; padding: 8px; text-align: left; font-size: 11px; }
+        th { background-color: #981E32; color: white; }
+        .term-header { background-color: #f0f0f0; font-weight: bold; }
+        h1 { color: #981E32; margin-bottom: 10px; }
+        h2 { color: #333; margin: 15px 0 10px 0; font-size: 14px; }
+        .stats { display: flex; gap: 20px; margin-bottom: 20px; }
+        .stat-box { padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .progress-bar { height: 20px; background: #e5e5e5; border-radius: 4px; margin: 10px 0; }
+        .progress-fill { height: 100%; background: #10b981; border-radius: 4px; }
+      </style>
+      <div id="print-content">
+        <h1>WSU Degree Plan</h1>
+        <p><strong>Degree:</strong> ${selectedPrograms?.majors?.[0]?.name || 'Not Selected'}</p>
+        <p><strong>Catalog Year:</strong> ${selectedYear || 'Current'}</p>
+        ${selectedPrograms?.minors?.length ? `<p><strong>Minors:</strong> ${selectedPrograms.minors.map(m => m.name).join(', ')}</p>` : ''}
+        ${selectedPrograms?.certificates?.length ? `<p><strong>Certificates:</strong> ${selectedPrograms.certificates.map(c => c.name).join(', ')}</p>` : ''}
+
+        <div class="stats">
+          <div class="stat-box"><strong>GPA:</strong> ${gpa}</div>
+          <div class="stat-box"><strong>Credits Achieved:</strong> ${creditsAchieved}</div>
+          <div class="stat-box"><strong>Credits Planned:</strong> ${creditsPlanned}</div>
+          <div class="stat-box"><strong>Credits Required:</strong> ${creditsRequired}</div>
+          <div class="stat-box"><strong>Progress:</strong> ${creditsRequired > 0 ? Math.round((creditsAchieved / creditsRequired) * 100) : 0}%</div>
+        </div>
+
+        ${years.map(year => {
+          const yearData = degreePlan[year.id] || { fall: { courses: [] }, spring: { courses: [] }, summer: { courses: [] } };
+          return `
+            <h2>${year.name}</h2>
+            <table>
+              <tr>
+                <th colspan="4">Fall</th>
+                <th colspan="4">Spring</th>
+                <th colspan="4">Summer</th>
+              </tr>
+              <tr class="term-header">
+                <td>Course</td><td>Cr</td><td>Status</td><td>Grade</td>
+                <td>Course</td><td>Cr</td><td>Status</td><td>Grade</td>
+                <td>Course</td><td>Cr</td><td>Status</td><td>Grade</td>
+              </tr>
+              ${(() => {
+                const maxRows = Math.max(
+                  yearData.fall.courses.length,
+                  yearData.spring.courses.length,
+                  yearData.summer.courses.length,
+                  1
+                );
+                let rows = '';
+                for (let i = 0; i < maxRows; i++) {
+                  const fall = yearData.fall.courses[i] || {};
+                  const spring = yearData.spring.courses[i] || {};
+                  const summer = yearData.summer.courses[i] || {};
+                  rows += '<tr>';
+                  rows += '<td>' + (fall.name || '') + '</td><td>' + (fall.credits || '') + '</td><td>' + (fall.status || '') + '</td><td>' + (fall.grade || '') + '</td>';
+                  rows += '<td>' + (spring.name || '') + '</td><td>' + (spring.credits || '') + '</td><td>' + (spring.status || '') + '</td><td>' + (spring.grade || '') + '</td>';
+                  rows += '<td>' + (summer.name || '') + '</td><td>' + (summer.credits || '') + '</td><td>' + (summer.status || '') + '</td><td>' + (summer.grade || '') + '</td>';
+                  rows += '</tr>';
+                }
+                return rows;
+              })()}
+            </table>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    // Build a full HTML document so the <title> is honored and we can add page-level rules
+    const html = `<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>WSU Degree Plan</title>
+          <style>
+            
+            @page { margin: 3mm 1cm; }
+            @media print {
+              body { margin: 0; -webkit-print-color-adjust: exact; }
+              /* Keep the content visible and allow fixed footer space */
+              #print-content { box-sizing: border-box; padding-bottom: 28mm; }
+              #print-footer { position: fixed; left: 0; right: 0; bottom: 8mm; text-align: center; font-size: 10px; color: #333; }
+              /* Re-apply table and typography styles for print */
+              table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+              th, td { border: 1px solid #333; padding: 8px; text-align: left; font-size: 11px; }
+              th { background-color: #981E32; color: white; }
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+      </html>`;
+
+    // Open print dialog and trigger print after the document loads so <title> and layout apply
+    const printWindow = window.open('', '_blank');
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => {
+      try {
+        printWindow.print();
+      } catch (e) {
+        console.warn('Print failed', e);
+      }
+    };
+    toast.success('Print dialog opened - select "Save as PDF" to export');
   };
 
   // Import from Excel (prefer hidden JSON backup for perfect round-trip)
@@ -2194,9 +2368,18 @@ function DegreePlanner() {
         <button
           onClick={handleExport}
           className="w-full sm:w-auto px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition touch-manipulation text-sm"
-          aria-label="Export plan"
+          aria-label="Export to Excel"
+          title="Export to Excel"
         >
-          Export
+          Excel
+        </button>
+        <button
+          onClick={handlePrintPDF}
+          className="w-full sm:w-auto px-3 py-2 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition touch-manipulation text-sm"
+          aria-label="Export to PDF"
+          title="Print or Save as PDF"
+        >
+          PDF
         </button>
         <label className="w-full sm:w-auto flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition cursor-pointer touch-manipulation text-sm">
           <span>Import</span>
@@ -2248,6 +2431,77 @@ function DegreePlanner() {
             </div>
         </div>
       </div>
+
+      {/* Degree Progress Bar */}
+      {creditsRequired > 0 && (
+        <div className="bg-white rounded-lg shadow p-4 mb-4">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="font-semibold text-gray-800">Degree Progress</h4>
+            <span className="text-sm font-medium text-gray-600">
+              {Math.min(Math.round((creditsAchieved / creditsRequired) * 100), 100)}% Complete
+            </span>
+          </div>
+
+          {/* Main Progress Bar */}
+          <div className="relative h-6 bg-gray-200 rounded-full overflow-hidden">
+            {/* Achieved (green) */}
+            <div
+              className="absolute h-full bg-green-500 transition-all duration-500"
+              style={{ width: `${Math.min((creditsAchieved / creditsRequired) * 100, 100)}%` }}
+            />
+            {/* Planned but not achieved (blue striped) */}
+            <div
+              className="absolute h-full bg-blue-400 opacity-60 transition-all duration-500"
+              style={{
+                left: `${Math.min((creditsAchieved / creditsRequired) * 100, 100)}%`,
+                width: `${Math.max(Math.min(((creditsPlanned - creditsAchieved) / creditsRequired) * 100, 100 - (creditsAchieved / creditsRequired) * 100), 0)}%`
+              }}
+            />
+            {/* Percentage label inside bar */}
+            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow">
+              {creditsAchieved} / {creditsRequired} credits
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-wrap gap-4 mt-3 text-xs">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 bg-green-500 rounded"></div>
+              <span className="text-gray-600">Completed ({creditsAchieved} cr)</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 bg-blue-400 rounded"></div>
+              <span className="text-gray-600">In Progress / Planned ({creditsPlanned - creditsAchieved} cr)</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 bg-gray-200 rounded"></div>
+              <span className="text-gray-600">Remaining ({Math.max(creditsRequired - creditsPlanned, 0)} cr)</span>
+            </div>
+          </div>
+
+          {/* Milestones */}
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              <div className={`p-2 rounded ${creditsAchieved >= 30 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                <div className="font-semibold">30 cr</div>
+                <div>Sophomore</div>
+              </div>
+              <div className={`p-2 rounded ${creditsAchieved >= 60 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                <div className="font-semibold">60 cr</div>
+                <div>Junior</div>
+              </div>
+              <div className={`p-2 rounded ${creditsAchieved >= 90 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                <div className="font-semibold">90 cr</div>
+                <div>Senior</div>
+              </div>
+              <div className={`p-2 rounded ${creditsAchieved >= creditsRequired ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                <div className="font-semibold">{creditsRequired} cr</div>
+                <div>Graduate</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Grade Scale Modal */}
       <GradeScaleModal show={showGradeScale} onClose={() => setShowGradeScale(false)} />
@@ -2370,6 +2624,8 @@ function DegreePlanner() {
               openClassCalc={(name) => { console.log('[DegreePlanner] openClassCalc ->', name); setClassCalcCourseName(name); setShowClassCalc(true); }}
               activeTermTab={activeTermTab}
               setActiveTermTab={setActiveTermTab}
+              allCompletedCourses={allCompletedCourses}
+              duplicateCourses={duplicateCourses}
             />
           ))}
         </div>

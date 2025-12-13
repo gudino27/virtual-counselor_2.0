@@ -633,18 +633,27 @@ async function importHistoricalCatalogData() {
   }
 
   try {
-    // Check if historical data already exists with narratives/descriptions
+    // Check if historical data already exists with narratives/descriptions AND courses
     const minorCheck = await dbGet(
       'SELECT COUNT(*) as count FROM catalog_minors WHERE narrative IS NOT NULL AND narrative != ""'
     );
     const certCheck = await dbGet(
       'SELECT COUNT(*) as count FROM catalog_certificates WHERE description IS NOT NULL AND description != ""'
     );
+    // Also check if courses are populated
+    const minorCoursesCheck = await dbGet(
+      'SELECT COUNT(*) as count FROM catalog_minors WHERE courses IS NOT NULL AND courses != "[]" AND courses != ""'
+    );
 
-    // If we already have substantial data, skip import
-    if ((minorCheck?.count || 0) > 100 && (certCheck?.count || 0) > 50) {
-      console.log(`📚 Historical catalog data already populated (${minorCheck.count} minors, ${certCheck.count} certificates with narratives)`);
+    // If we already have substantial data WITH courses, skip import
+    if ((minorCheck?.count || 0) > 100 && (certCheck?.count || 0) > 50 && (minorCoursesCheck?.count || 0) > 50) {
+      console.log(`📚 Historical catalog data already populated (${minorCheck.count} minors, ${certCheck.count} certificates with narratives, ${minorCoursesCheck.count} with courses)`);
       return;
+    }
+
+    // If data exists but courses are missing, we'll re-import to add courses
+    if ((minorCheck?.count || 0) > 100 && (minorCoursesCheck?.count || 0) < 50) {
+      console.log('📚 Re-importing historical catalog data to add extracted courses...');
     }
 
     console.log('📚 Importing historical catalog data from PDF archives...');

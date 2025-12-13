@@ -70,13 +70,48 @@ function CourseNotes({ notes }) {
 }
 
 // Course Row Component with autocomplete
-function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog, openClassCalc }) {
+function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog, openClassCalc, completedCourses = [], duplicateCourses = new Set() }) {
   const textareaRef = useRef(null);
   const [courseSuggestions, setCourseSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedCourseInfo, setSelectedCourseInfo] = useState(null);
   const [expandedInfoIdx, setExpandedInfoIdx] = useState(null);
+
+  // Check if prerequisites are met for this course
+  const checkPrereqsMet = () => {
+    // If course has no prerequisites info, assume met
+    if (!course.prerequisites || course.prerequisites.length === 0) return { met: true, missing: [] };
+
+    const completedSet = new Set(completedCourses.map(c => c.toUpperCase()));
+    const missing = [];
+
+    // Prerequisites can be a flat array of course codes
+    const prereqCodes = Array.isArray(course.prerequisites)
+      ? course.prerequisites.map(p => String(p).toUpperCase())
+      : [];
+
+    prereqCodes.forEach(prereq => {
+      if (!completedSet.has(prereq)) {
+        missing.push(prereq);
+      }
+    });
+
+    return { met: missing.length === 0, missing };
+  };
+
+  const prereqStatus = checkPrereqsMet();
+
+  // Check if this course is a duplicate
+  const isDuplicate = (() => {
+    if (!course.name) return false;
+    const match = course.name.match(/^([A-Z]{2,6}\s*\d{3})/i);
+    if (match) {
+      const code = match[1].toUpperCase().replace(/\s+/g, ' ');
+      return duplicateCourses.has ? duplicateCourses.has(code) : duplicateCourses[code];
+    }
+    return false;
+  })();
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -121,6 +156,11 @@ function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog, open
     if (courseData.description) {
       onUpdate(course.id, 'description', courseData.description);
     }
+    // Store prerequisites for prereq checking
+    if (courseData.prerequisite_codes || courseData.prerequisiteCodes) {
+      const prereqs = courseData.prerequisite_codes || courseData.prerequisiteCodes;
+      onUpdate(course.id, 'prerequisites', Array.isArray(prereqs) ? prereqs : []);
+    }
     setShowSuggestions(false);
     setSelectedCourseInfo(null);
   };
@@ -149,6 +189,30 @@ function CourseRow({ course, onUpdate, onRemove, yearId, term, openCatalog, open
 
   return (
     <div className="space-y-2 group relative">
+      {/* Duplicate Course Warning Banner */}
+      {isDuplicate && course.name && (
+        <div className="flex items-center gap-2 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+          <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <span>
+            <strong>Duplicate:</strong> This course appears multiple times in your plan
+          </span>
+        </div>
+      )}
+
+      {/* Prerequisite Warning Banner */}
+      {!prereqStatus.met && course.name && course.status !== 'taken' && (
+        <div className="flex items-center gap-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
+          <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <span>
+            <strong>Missing prerequisites:</strong> {prereqStatus.missing.join(', ')}
+          </span>
+        </div>
+      )}
+
       <div className="flex gap-2 items-start">
         <div className="flex-1 relative">
           <textarea

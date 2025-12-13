@@ -164,9 +164,10 @@ function DegreeSelector({
                     <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-wsu-crimson">
                        Degree Information & Requirements
                     </summary>
-                    <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-                      {prog.data.degree.narrative}
-                    </div>
+                    <div
+                      className="mt-2 text-sm text-gray-600 leading-relaxed prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: prog.data.degree.narrative }}
+                    />
                   </details>
                 )}
               </div>
@@ -194,9 +195,10 @@ function DegreeSelector({
                     <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-wsu-crimson">
                        Minor Information & Requirements
                     </summary>
-                    <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-                      {prog.data.degree.narrative}
-                    </div>
+                    <div
+                      className="mt-2 text-sm text-gray-600 leading-relaxed prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: prog.data.degree.narrative }}
+                    />
                     {prog.data?.courses && prog.data.courses.length > 0 && (
                       <div className="mt-3">
                         <div className="text-sm font-medium text-gray-700 mb-2">Extracted Courses</div>
@@ -252,9 +254,10 @@ function DegreeSelector({
                     <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-wsu-crimson">
                        Certificate Information & Requirements
                     </summary>
-                    <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-                      {prog.data.degree.narrative}
-                    </div>
+                    <div
+                      className="mt-2 text-sm text-gray-600 leading-relaxed prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: prog.data.degree.narrative }}
+                    />
                     {prog.data?.courses && prog.data.courses.length > 0 && (
                       <div className="mt-3">
                         <div className="text-sm font-medium text-gray-700 mb-2">Extracted Courses</div>
