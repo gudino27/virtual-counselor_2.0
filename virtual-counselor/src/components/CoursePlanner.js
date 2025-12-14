@@ -147,6 +147,36 @@ function CoursePlanner() {
     return Array.from(yearSet).sort((a, b) => b - a);
   }, [terms]);
 
+  // Extract available years for the selected term
+  const availableYearsForTerm = useMemo(() => {
+    if (!terms || terms.length === 0) {
+      // Fallback to current and next year if no terms loaded yet
+      const currentYear = new Date().getFullYear();
+      return [currentYear + 1, currentYear];
+    }
+
+    const yearSet = new Set();
+    terms.forEach(term => {
+      // Filter years by the selected term
+      if (term.term === filters.term && term.year) {
+        yearSet.add(parseInt(term.year));
+      }
+    });
+
+    // Sort years in descending order (newest first)
+    const sorted = Array.from(yearSet).sort((a, b) => b - a);
+
+    // If no years found for this term, return all available years as fallback
+    return sorted.length > 0 ? sorted : availableYears;
+  }, [terms, filters.term, availableYears]);
+
+  // Update year filter if current year is not in availableYearsForTerm
+  useEffect(() => {
+    if (availableYearsForTerm.length > 0 && !availableYearsForTerm.includes(parseInt(filters.year))) {
+      setFilters(prev => ({ ...prev, year: availableYearsForTerm[0].toString() }));
+    }
+  }, [availableYearsForTerm, filters.year]);
+
   const searchCourses = async () => {
     setLoading(true);
     try {
@@ -270,9 +300,9 @@ function CoursePlanner() {
                     onChange={(e) => setFilters({ ...filters, term: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-wsu-crimson focus:border-transparent dark:bg-gray-700 dark:text-white"
                   >
-                    <option value="Fall">Fall</option>
                     <option value="Spring">Spring</option>
                     <option value="Summer">Summer</option>
+                    <option value="Fall">Fall</option>
                   </select>
                 </div>
 
@@ -283,8 +313,9 @@ function CoursePlanner() {
                     onChange={(e) => setFilters({ ...filters, year: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-wsu-crimson focus:border-transparent dark:bg-gray-700 dark:text-white"
                   >
-                    <option value="2026">2026</option>
-                    <option value="2025">2025</option>
+                    {availableYearsForTerm.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
                   </select>
                 </div>
 
