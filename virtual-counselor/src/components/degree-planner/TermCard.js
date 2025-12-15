@@ -5,6 +5,7 @@ import CourseRow, { GRADE_POINTS } from './CourseRow';
 function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, openCatalogForCourse, openClassCalc, onMoveClick, allCompletedCourses, duplicateCourses }) {
   const totalCredits = courses.reduce((sum, c) => sum + (c.credits || 0), 0);
 
+  // Calculate official GPA (only finalized grades)
   const calculateTermGPA = () => {
     let points = 0;
     let credits = 0;
@@ -16,6 +17,27 @@ function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, ope
     });
     return credits > 0 ? (points / credits).toFixed(2) : '—';
   };
+
+  // Calculate In-Progress GPA (includes taken + in-progress with grades)
+  const calculateInProgressGPA = () => {
+    let points = 0;
+    let credits = 0;
+    let hasInProgress = false;
+
+    courses.forEach(c => {
+      if ((c.status === 'taken' || c.status === 'in-progress') && c.grade) {
+        points += (GRADE_POINTS[c.grade] || 0) * c.credits;
+        credits += c.credits;
+        if (c.status === 'in-progress') hasInProgress = true;
+      }
+    });
+
+    if (!hasInProgress || credits === 0) return null;
+    return (points / credits).toFixed(2);
+  };
+
+  const termGPA = calculateTermGPA();
+  const inProgressGPA = calculateInProgressGPA();
 
   const addCourse = () => {
     const newCourse = {
@@ -67,9 +89,17 @@ function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, ope
   const statusColor = totalCredits >= 12 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4">
+    <div className="border border-gray-200 rounded-lg p-4 relative">
       <div className="flex justify-between items-center mb-3">
-        <h4 className="font-semibold">{title}</h4>
+        <div className="flex justify-between items-center">
+          <span className="text-gray-600">Term GPA: </span>
+          <span className="font-semibold dark:text-black ml-2">{termGPA} </span>
+          {inProgressGPA && (
+            <span className="font-semibold text-blue-600 dark:text-black ml-2" title="Includes in-progress courses">
+              ({inProgressGPA} est.)
+            </span>
+          )}
+        </div>
         <span className={`px-2 py-1 rounded text-xs font-medium ${statusColor}`}>
           {enrollmentStatus}
         </span>
@@ -107,12 +137,7 @@ function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, ope
         + Add Course
       </button>
 
-      <div className="mt-3 pt-3 border-t text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Term GPA:</span>
-          <span className="font-semibold">{calculateTermGPA()}</span>
-        </div>
-      </div>
+
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 
-function OptimizeModal({ show, onClose, optimizeSpeed, setOptimizeSpeed, onOptimize }) {
+function OptimizeModal({ show, onClose, optimizeSpeed, setOptimizeSpeed, includeSummer, setIncludeSummer, ensureFullTime, setEnsureFullTime, onOptimize }) {
   if (!show) return null;
 
   return (
@@ -40,6 +40,30 @@ function OptimizeModal({ show, onClose, optimizeSpeed, setOptimizeSpeed, onOptim
               className="w-4 h-4"
             />
             <span className="dark:text-gray-200">Relaxed (12 credits/semester minimum)</span>
+          </label>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeSummer}
+              onChange={(e) => setIncludeSummer(e.target.checked)}
+              className="w-4 h-4 text-wsu-crimson rounded focus:ring-wsu-crimson"
+            />
+            <span className="dark:text-gray-200 font-medium">Include Summer Terms</span>
+          </label>
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={ensureFullTime}
+              onChange={(e) => setEnsureFullTime(e.target.checked)}
+              className="w-4 h-4 text-wsu-crimson rounded focus:ring-wsu-crimson"
+            />
+            <div className="flex flex-col">
+                <span className="dark:text-gray-200 font-medium">Ensure Full Time (12+ credits)</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Allows exceeding relaxed limit (up to 14) to reach 12 credits.</span>
+            </div>
           </label>
         </div>
         <div className="flex space-x-3 mt-6">

@@ -8,7 +8,7 @@ const DEFAULT_CATEGORIES = [
   { name: 'Participation', weight: 10, assignments: [] },
 ];
 
-export default function ClassGradeCalculator({ courseName, onClose }) {
+export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrade }) {
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [targetGrade, setTargetGrade] = useState('A');
   const [selectedCategoryForCalc, setSelectedCategoryForCalc] = useState(0);
@@ -240,6 +240,18 @@ export default function ClassGradeCalculator({ courseName, onClose }) {
     if (['D+', 'D', 'D-'].includes(grade)) return 'text-orange-600';
     return 'text-red-600';
   };
+
+  // Notify parent of grade updates
+  useEffect(() => {
+    if (onUpdateGrade) {
+      if (currentGrade !== null) {
+        const letter = getLetterGrade(currentGrade);
+        onUpdateGrade(currentGrade, letter);
+      } else {
+        onUpdateGrade(null, null);
+      }
+    }
+  }, [currentGrade, onUpdateGrade]);
 
   const containerRef = useRef(null);
 

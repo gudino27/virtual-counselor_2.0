@@ -659,8 +659,6 @@ function CourseCard({ courseKey, course, sections, isExpanded, onToggle, onAdd, 
   );
 }
 
-// WeeklyCalendar moved to ./course-planner/WeeklyCalendar.js
-// CourseDetailsModal moved to ./course-planner/CourseDetailsModal.js
 
 // Color Picker Modal
 function ColorPickerModal({ courseId, currentColor, onSelect, onClose }) {
@@ -700,11 +698,11 @@ function ColorPickerModal({ courseId, currentColor, onSelect, onClose }) {
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium">Mode</label>
             <div className="ml-auto flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="radio" name="mode" checked={!useGradient} onChange={() => setUseGradient(false)} />
+              <label className="flex items-center gap-2 text-sm dark:text-black">
+                <input type="radio" name="mode" checked={!useGradient} onChange={() => setUseGradient(false)}/>
                 Solid
               </label>
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm dark:text-black">
                 <input type="radio" name="mode" checked={useGradient} onChange={() => setUseGradient(true)} />
                 Gradient
               </label>
@@ -720,14 +718,14 @@ function ColorPickerModal({ courseId, currentColor, onSelect, onClose }) {
           </div>
 
           <div>
-            <label className="block text-xs text-gray-500 mb-1 flex flex-col items-center font-medium">Preview</label>
+            <label className="text-xs text-gray-500 mb-1 flex flex-col items-center font-medium">Preview</label>
             <div className="w-full h-12 rounded flex items-center justify-center" style={{ background: useGradient ? `linear-gradient(90deg, ${startColor}, ${endColor})` : startColor, color: getContrastingTextColor(useGradient ? startColor : startColor) }}>
               <span className="font-medium">Preview</span>
             </div>
           </div>
 
           <div className="flex justify-end gap-2 mt-2">
-            <button onClick={onClose} className="px-3 py-2 rounded border">Cancel</button>
+            <button onClick={onClose} className="px-3 py-2 rounded border dark: text-black">Cancel</button>
             <button onClick={onSave} className="px-3 py-2 rounded bg-wsu-crimson text-white">Save</button>
           </div>
         </div>

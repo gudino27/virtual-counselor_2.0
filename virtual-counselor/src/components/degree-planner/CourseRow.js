@@ -82,6 +82,9 @@ function CourseRow({ course, onUpdate, onRemove, onMoveClick, yearId, term, open
 
   // Check if prerequisites are met for this course
   const checkPrereqsMet = () => {
+    // Override: User manually marked as met
+    if (course.prereqsMetOverride) return { met: true, missing: [] };
+
     // If course has no prerequisites info, assume met
     if (!course.prerequisites || course.prerequisites.length === 0) return { met: true, missing: [] };
 
@@ -107,9 +110,10 @@ function CourseRow({ course, onUpdate, onRemove, onMoveClick, yearId, term, open
   // Check if this course is a duplicate
   const isDuplicate = (() => {
     if (!course.name) return false;
-    const match = course.name.match(/^([A-Z]{2,6}\s*\d{3})/i);
+    // Robust extraction matching analyzeDegreeProgress
+    const match = course.name.match(/^([A-Z\s&/]{2,15})\s*(\d{3})/i);
     if (match) {
-      const code = match[1].toUpperCase().replace(/\s+/g, ' ');
+      const code = `${match[1].trim().toUpperCase()} ${match[2]}`;
       return duplicateCourses.has ? duplicateCourses.has(code) : duplicateCourses[code];
     }
     return false;
@@ -227,9 +231,16 @@ function CourseRow({ course, onUpdate, onRemove, onMoveClick, yearId, term, open
           <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
-          <span>
+          <span className="flex-1">
             <strong>Missing prerequisites:</strong> {prereqStatus.missing.join(', ')}
           </span>
+          <button 
+            onClick={() => onUpdate(course.id, 'prereqsMetOverride', true)}
+            className="text-xs underline hover:text-amber-900 whitespace-nowrap"
+            title="Dismiss this warning"
+          >
+            Mark as Met
+          </button>
         </div>
       )}
 
@@ -583,7 +594,14 @@ function CourseRow({ course, onUpdate, onRemove, onMoveClick, yearId, term, open
         {/* Grade calculator trigger */}
         <button
           type="button"
-          onClick={(e) => { e.preventDefault(); console.log('[CourseRow] calc button clicked', course.name); if (openClassCalc) openClassCalc(course.name || 'Course'); else console.warn('openClassCalc is not provided'); }}
+          onClick={(e) => { 
+            e.preventDefault(); 
+            if (openClassCalc) {
+              openClassCalc(course.id, course.name);
+            } else {
+              console.warn('openClassCalc is not provided');
+            }
+          }}
           aria-label="Open grade calculator to track assignments and calculate your grade"
           title="Calculate your grade - track assignments, see what you need to get your target grade"
           className="flex-1 flex items-center justify-center gap-1.5 text-xs px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 active:scale-95 shadow-sm hover:shadow transition-all"
