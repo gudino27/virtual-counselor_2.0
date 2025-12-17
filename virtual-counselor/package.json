@@ -22,7 +22,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^30.0.0",
     "@types/supertest": "^6.0.3",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.22",
     "jest": "^27.5.1",
     "jsdom": "^27.3.0",
