@@ -21,7 +21,7 @@
     "axios": "^1.6.2",
     "better-sqlite3": "^9.2.2",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.2.4",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
