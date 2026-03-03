@@ -58,6 +58,7 @@ function CoursePlanner() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
   const [totalResults, setTotalResults] = useState(0);
+  const [showSubjectName, setShowSubjectName] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
   // Load saved schedule from localStorage
@@ -377,14 +378,29 @@ function CoursePlanner() {
 
           {/* Search Results */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 flex-1 overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center mb-3">
-              <div className="flex items-center gap-3">
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex flex-col gap-0.5">
                 <h4 className="font-semibold text-gray-700 dark:text-gray-300">
                   {loading ? 'Searching...' : `${totalResults} Courses`}
                 </h4>
-                {!loading && totalResults > 0 && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Showing {(page - 1) * pageSize + 1}-{Math.min((page) * pageSize, totalResults)} of {totalResults}</div>
-                )}
+                <div className="flex items-center gap-3">
+                  {!loading && totalResults > 0 && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalResults)} of {totalResults}
+                    </span>
+                  )}
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <div
+                      onClick={() => setShowSubjectName(s => !s)}
+                      className={`relative w-8 h-4 rounded-full transition-colors ${showSubjectName ? 'bg-wsu-crimson' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${showSubjectName ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {showSubjectName ? 'Subject name' : 'Code'}
+                    </span>
+                  </label>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -432,6 +448,7 @@ function CoursePlanner() {
                       onAdd={addCourseToSchedule}
                       onShowDetails={setSelectedCourseDetails}
                       selectedCourses={selectedCourses}
+                      showSubjectName={showSubjectName}
                     />
                   ));
                 })()
@@ -552,7 +569,10 @@ function CoursePlanner() {
 }
 
 // Course Card Component
-function CourseCard({ courseKey, course, sections, isExpanded, onToggle, onAdd, onShowDetails, selectedCourses }) {
+function CourseCard({ courseKey, course, sections, isExpanded, onToggle, onAdd, onShowDetails, selectedCourses, showSubjectName }) {
+  const courseLabel = showSubjectName
+    ? `${course.subject || course.prefix || course.coursePrefix} ${course.courseNumber}`
+    : `${course.prefix || course.coursePrefix} ${course.courseNumber}`;
   const isAdded = (section) => selectedCourses.some(c => c.uniqueId === section.uniqueId);
 
   return (
@@ -563,7 +583,7 @@ function CourseCard({ courseKey, course, sections, isExpanded, onToggle, onAdd, 
       >
         <div className="flex-1">
           <div className="font-semibold text-gray-900 dark:text-white">
-            {course.prefix || course.coursePrefix} {course.courseNumber}
+            {courseLabel}
             <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
               {course.credits} credit{course.credits !== 1 ? 's' : ''}
             </span>

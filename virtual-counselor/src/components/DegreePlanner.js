@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
 import ClassGradeCalculator from "./ClassGradeCalculator";
 import { fetchDegrees, fetchDegreeRequirements } from "../utils/api";
@@ -831,6 +831,35 @@ function DegreePlanner() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]);
 
+  const handleCalcClose = useCallback(() => {
+    setShowClassCalc(false);
+    setClassCalcCourseName(null);
+    setClassCalcCourseId(null);
+  }, []);
+
+  const handleGradeUpdate = useCallback((_gradeValue, letterGrade) => {
+    if (!classCalcCourseId) return;
+    if (!letterGrade) return;
+    setDegreePlan(prev => {
+      const newPlan = JSON.parse(JSON.stringify(prev));
+      let found = false;
+      Object.keys(newPlan).forEach(yearId => {
+        ['fall', 'spring', 'summer'].forEach(term => {
+          if (found) return;
+          const courses = newPlan[yearId][term].courses || [];
+          courses.forEach(c => {
+            if (c.id === classCalcCourseId) {
+              c.grade = letterGrade;
+              if (c.status !== 'taken') c.status = 'in-progress';
+              found = true;
+            }
+          });
+        });
+      });
+      return newPlan;
+    });
+  }, [classCalcCourseId]);
+
   return (
     <div className="space-y-6">
       {/* Action Buttons */}
@@ -995,47 +1024,8 @@ function DegreePlanner() {
       {showClassCalc && (
         <ClassGradeCalculator
           courseName={classCalcCourseName}
-          onClose={() => {
-            setShowClassCalc(false);
-            setClassCalcCourseName(null);
-            setClassCalcCourseId(null);
-          }}
-          onUpdateGrade={(gradeValue, letterGrade) => {
-             // Find and update the course
-             if (!classCalcCourseId) return;
-             
-             setDegreePlan(prev => {
-                const newPlan = JSON.parse(JSON.stringify(prev));
-                let found = false;
-                
-                Object.keys(newPlan).forEach(yearId => {
-                   ['fall', 'spring', 'summer'].forEach(term => {
-                      if (found) return;
-                      const courses = newPlan[yearId][term].courses || [];
-                      courses.forEach(c => {
-                         if (c.id === classCalcCourseId) {
-                            if (letterGrade) {
-                               c.grade = letterGrade;
-                               // Only switch to in-progress if not already taken (don't downgrade status)
-                               if (c.status !== 'taken') {
-                                  c.status = 'in-progress';
-                               }
-                            } else {
-                               // Grade cleared
-                               c.grade = '';
-                               // Revert in-progress to planned
-                               if (c.status === 'in-progress') {
-                                  c.status = 'planned';
-                               }
-                            }
-                            found = true;
-                         }
-                      });
-                   });
-                });
-                return newPlan;
-             });
-          }}
+          onClose={handleCalcClose}
+          onUpdateGrade={handleGradeUpdate}
         />
       )}
 
