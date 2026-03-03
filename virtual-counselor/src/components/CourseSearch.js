@@ -21,7 +21,13 @@ function CourseSearch() {
   const [page, setPage] = useState(1);
   const [totalCourses, setTotalCourses] = useState(0);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
+  const [showSubject, setShowSubject] = useState(false);
   const coursesPerPage = 50;
+
+  const displayCourseCode = (course) =>
+    showSubject
+      ? `${course.subject || course.prefix} ${course.courseNumber}`
+      : `${course.prefix} ${course.courseNumber}`;
 
   useEffect(() => {
     loadTerms();
@@ -203,13 +209,27 @@ function CourseSearch() {
           />
         </div>
 
-        <button
-          onClick={search}
-          disabled={loading}
-          className="w-full md:w-auto px-6 py-3 bg-crimson text-white rounded-lg hover:bg-crimson/90 transition font-semibold disabled:opacity-50"
-        >
-          {loading ? 'Searching...' : 'Search Courses'}
-        </button>
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            onClick={search}
+            disabled={loading}
+            className="w-full md:w-auto px-6 py-3 bg-crimson text-white rounded-lg hover:bg-crimson/90 transition font-semibold disabled:opacity-50"
+          >
+            {loading ? 'Searching...' : 'Search Courses'}
+          </button>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <div
+              onClick={() => setShowSubject(s => !s)}
+              className={`relative w-10 h-5 rounded-full transition-colors ${showSubject ? 'bg-crimson' : 'bg-gray-300 dark:bg-gray-600'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${showSubject ? 'translate-x-5' : 'translate-x-0'}`} />
+            </div>
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Show subject names <span className="text-gray-400 dark:text-gray-500 text-xs">({showSubject ? 'e.g. Spanish 101' : 'e.g. SPAN 101'})</span>
+            </span>
+          </label>
+        </div>
       </div>
 
       {/* Results */}
@@ -261,7 +281,7 @@ function CourseSearch() {
               <div className="space-y-2 divide-y divide-gray-100 dark:divide-gray-700">
                 {courses.map(c => (
                   <div key={c.id || c.uniqueId} className="pt-2 first:pt-0">
-                    <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">{c.prefix} {c.courseNumber}</div>
+                    <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">{displayCourseCode(c)}</div>
                     <div className="text-xs text-gray-600 dark:text-gray-400 truncate">{c.title}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-500">{c.dayTime || 'TBA'}</div>
                   </div>
@@ -295,7 +315,7 @@ function CourseSearch() {
 
                   return (
                     <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-4 py-3 font-mono text-sm font-medium dark:text-gray-200">{course.prefix} {course.courseNumber}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-medium dark:text-gray-200">{displayCourseCode(course)}</td>
                       <td className="px-4 py-3 text-sm text-center dark:text-gray-300">{course.sectionNumber || '-'}</td>
                       <td className="px-4 py-3 text-sm dark:text-gray-300">{course.title}</td>
                       <td className="px-4 py-3">

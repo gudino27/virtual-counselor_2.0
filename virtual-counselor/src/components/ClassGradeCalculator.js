@@ -255,18 +255,23 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
 
   const containerRef = useRef(null);
 
+  // Auto-focus the first element only on mount — not on every onClose reference change
   useEffect(() => {
     const prev = document.activeElement;
     const toFocus = containerRef.current?.querySelector('input,select,button,textarea');
     if (toFocus) toFocus.focus();
+    return () => {
+      try { prev && prev.focus(); } catch (e) {}
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Escape key handler — re-registers when onClose changes, but does NOT steal focus
+  useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') onClose && onClose();
     };
     document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      try { prev && prev.focus(); } catch (e) {}
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   return (
@@ -276,7 +281,7 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
         role="dialog"
         aria-modal="true"
         aria-label="Class Grade Calculator"
-        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] sm:max-h-[70vh] overflow-hidden flex flex-col transform translate-y-[3vh] "
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] sm:max-h-[70vh] overflow-hidden flex flex-col transform translate-y-[3vh]"
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-wsu-crimson to-red-700 px-4 sm:px-6 py-3 sm:py-4 text-white">
@@ -315,14 +320,14 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-4 sm:space-y-6">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-4 sm:space-y-6 bg-white dark:bg-gray-800">
           {/* Current Grade Display */}
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 sm:p-5 border border-gray-200">
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-700 rounded-xl p-4 sm:p-5 border border-gray-200 dark:border-gray-600">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Current Grade</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Current Grade</p>
                 <div className="flex items-baseline gap-3 mt-1">
-                  <span className="text-4xl font-bold text-gray-900">
+                  <span className="text-4xl font-bold text-gray-900 dark:text-white">
                     {currentGrade !== null ? `${currentGrade.toFixed(1)}%` : '—'}
                   </span>
                   {currentGrade !== null && (
@@ -332,7 +337,7 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                   )}
                 </div>
                 {currentGrade === null && (
-                  <p className="text-sm text-gray-500 mt-1">Add assignments to see your grade</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add assignments to see your grade</p>
                 )}
               </div>
               <div className="hidden sm:block">
@@ -353,24 +358,24 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
             </div>
 
             {/* Calculation Mode Toggle */}
-            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-700">Calculation Mode</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Calculation Mode</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     {calcMode === 'available'
                       ? `Based on ${categoriesWithGrades} of ${categories.length} categories with grades`
                       : 'Using all categories (missing = 0%)'
                     }
                   </p>
                 </div>
-                <div className="flex bg-gray-200 rounded-lg p-1 self-start sm:self-auto">
+                <div className="flex bg-gray-200 dark:bg-gray-600 rounded-lg p-1 self-start sm:self-auto">
                   <button
                     onClick={() => setCalcMode('available')}
                     className={`px-3 py-2 sm:py-1.5 text-xs font-medium rounded-md transition-all touch-manipulation ${
                       calcMode === 'available'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
+                        ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                     }`}
                   >
                     Available Only
@@ -379,8 +384,8 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                     onClick={() => setCalcMode('all')}
                     className={`px-3 py-2 sm:py-1.5 text-xs font-medium rounded-md transition-all touch-manipulation ${
                       calcMode === 'all'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
+                        ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                     }`}
                   >
                     All Categories
@@ -414,8 +419,8 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
           {/* Categories Section */}
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
                 Grade Categories
@@ -443,8 +448,8 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                     key={index}
                     className={`rounded-xl border transition-all ${
                       hasGrade
-                        ? 'bg-white border-gray-200 shadow-sm'
-                        : 'bg-gray-50 border-gray-200 border-dashed'
+                        ? 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 shadow-sm'
+                        : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 border-dashed'
                     }`}
                   >
                     {/* Category Header */}
@@ -467,7 +472,7 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                             type="text"
                             value={category.name}
                             onChange={(e) => handleCategoryChange(index, 'name', e.target.value)}
-                            className="flex-1 min-w-0 text-sm font-semibold text-gray-900 bg-transparent border-0 focus:outline-none focus:ring-0 px-0"
+                            className="flex-1 min-w-0 text-sm font-semibold text-gray-900 dark:text-white bg-transparent border-0 focus:outline-none focus:ring-0 px-0"
                             placeholder="Category name"
                           />
                           <button
@@ -526,7 +531,7 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                           type="text"
                           value={category.name}
                           onChange={(e) => handleCategoryChange(index, 'name', e.target.value)}
-                          className="flex-1 text-base font-semibold text-gray-900 bg-transparent border-0 focus:outline-none focus:ring-0 px-0"
+                          className="flex-1 text-base font-semibold text-gray-900 dark:text-white bg-transparent border-0 focus:outline-none focus:ring-0 px-0"
                           placeholder="Category name"
                         />
 
@@ -607,11 +612,11 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
 
                     {/* Expanded Assignments Section */}
                     {isExpanded && (
-                      <div className="px-2 sm:px-4 pb-4 border-t border-gray-100 bg-gray-50/50">
+                      <div className="px-2 sm:px-4 pb-4 border-t border-gray-100 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50">
                         <div className="pt-3 space-y-2">
                           {/* Assignment Headers - hidden on mobile */}
                           {category.assignments.length > 0 && (
-                            <div className="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 px-2">
+                            <div className="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 px-2">
                               <div className="col-span-5">Assignment</div>
                               <div className="col-span-2 text-center">Earned</div>
                               <div className="col-span-2 text-center">Total</div>
@@ -626,7 +631,7 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                               ? (assignment.earnedPoints / assignment.totalPoints) * 100
                               : null;
                             return (
-                              <div key={assignment.id} className="bg-white rounded-lg p-3 border border-gray-200">
+                              <div key={assignment.id} className="bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
                                 {/* Mobile Layout */}
                                 <div className="sm:hidden space-y-2">
                                   <div className="flex items-center justify-between">
@@ -634,7 +639,7 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                                       type="text"
                                       value={assignment.name}
                                       onChange={(e) => updateAssignment(index, assignment.id, 'name', e.target.value)}
-                                      className="flex-1 text-sm font-medium border-0 bg-transparent focus:outline-none focus:ring-0 p-0"
+                                      className="flex-1 text-sm font-medium text-gray-900 dark:text-white border-0 bg-transparent focus:outline-none focus:ring-0 p-0"
                                       placeholder="Assignment name"
                                     />
                                     <button
@@ -648,12 +653,12 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <div className="flex-1">
-                                      <label className="block text-xs text-gray-500 mb-1">Earned</label>
+                                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Earned</label>
                                       <input
                                         type="number"
                                         value={assignment.earnedPoints || ''}
                                         onChange={(e) => updateAssignment(index, assignment.id, 'earnedPoints', e.target.value)}
-                                        className="w-full text-sm text-center border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
+                                        className="w-full text-sm text-center border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2 bg-white dark:bg-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
                                         placeholder="0"
                                         min="0"
                                         step="0.5"
@@ -661,12 +666,12 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                                     </div>
                                     <div className="text-gray-400 pt-5">/</div>
                                     <div className="flex-1">
-                                      <label className="block text-xs text-gray-500 mb-1">Total</label>
+                                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Total</label>
                                       <input
                                         type="number"
                                         value={assignment.totalPoints || ''}
                                         onChange={(e) => updateAssignment(index, assignment.id, 'totalPoints', e.target.value)}
-                                        className="w-full text-sm text-center border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
+                                        className="w-full text-sm text-center border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2 bg-white dark:bg-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
                                         placeholder="0"
                                         min="0"
                                         step="0.5"
@@ -702,7 +707,7 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                                       type="number"
                                       value={assignment.earnedPoints || ''}
                                       onChange={(e) => updateAssignment(index, assignment.id, 'earnedPoints', e.target.value)}
-                                      className="w-full text-sm text-center border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
+                                      className="w-full text-sm text-center border border-gray-300 dark:border-gray-500 rounded px-2 py-1 bg-white dark:bg-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
                                       placeholder="0"
                                       min="0"
                                       step="0.5"
@@ -713,7 +718,7 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                                       type="number"
                                       value={assignment.totalPoints || ''}
                                       onChange={(e) => updateAssignment(index, assignment.id, 'totalPoints', e.target.value)}
-                                      className="w-full text-sm text-center border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
+                                      className="w-full text-sm text-center border border-gray-300 dark:border-gray-500 rounded px-2 py-1 bg-white dark:bg-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-wsu-crimson focus:border-transparent"
                                       placeholder="0"
                                       min="0"
                                       step="0.5"
@@ -771,9 +776,9 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
           </div>
 
           {/* What Grade Do I Need Section */}
-          <div className="bg-blue-50 rounded-xl border border-blue-200 overflow-hidden">
-            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-blue-200 bg-blue-100/50">
-              <h3 className="font-bold text-blue-900 flex items-center gap-2">
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 overflow-hidden">
+            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
+              <h3 className="font-bold text-blue-900 dark:text-blue-300 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
@@ -784,11 +789,11 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
             <div className="p-4 sm:p-5 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-blue-900 mb-2">Target Grade</label>
+                  <label className="block text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">Target Grade</label>
                   <select
                     value={targetGrade}
                     onChange={(e) => setTargetGrade(e.target.value)}
-                    className="w-full px-3 py-3 sm:py-2.5 bg-white border border-blue-300 rounded-lg text-gray-900 font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm"
+                    className="w-full px-3 py-3 sm:py-2.5 bg-white dark:bg-gray-700 border border-blue-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm"
                   >
                     <option value="A">A (93%)</option>
                     <option value="A-">A- (90%)</option>
@@ -802,11 +807,11 @@ export default function ClassGradeCalculator({ courseName, onClose, onUpdateGrad
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-blue-900 mb-2">On Category</label>
+                  <label className="block text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">On Category</label>
                   <select
                     value={selectedCategoryForCalc}
                     onChange={(e) => setSelectedCategoryForCalc(parseInt(e.target.value))}
-                    className="w-full px-3 py-3 sm:py-2.5 bg-white border border-blue-300 rounded-lg text-gray-900 font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm"
+                    className="w-full px-3 py-3 sm:py-2.5 bg-white dark:bg-gray-700 border border-blue-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm"
                   >
                     {categories.map((cat, idx) => (
                       <option key={idx} value={idx}>
