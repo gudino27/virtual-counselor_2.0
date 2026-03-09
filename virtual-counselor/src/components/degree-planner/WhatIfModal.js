@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Check } from "lucide-react";
 import { fetchDegrees, fetchDegreeRequirements, fetchMinors, fetchCertificates, searchCatalogCourses } from "../../utils/api"; // Added searchCatalogCourses
 import { analyzeWhatIf } from "../../utils/degreeCalculations";
 import CatalogModal from "./CatalogModal"; // Added CatalogModal
@@ -367,7 +368,7 @@ export default function WhatIfModal({ show, onClose, degreePlan, userCourses = [
                                                 </button>
                                             )}
                                             <div className="h-6 w-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                                                <span className="text-green-600 dark:text-green-400 text-xs font-bold">✔</span>
+                                                <span className="text-green-600 dark:text-green-400 text-xs font-bold"><Check className="w-3 h-3" /></span>
                                             </div>
                                        </div>
                                    </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X } from 'lucide-react';
 import { searchCatalogCourses } from '../../utils/api';
 import { loadRecentCourses, saveRecentCourse } from '../../utils/storage';
 
@@ -529,7 +530,7 @@ function CourseRow({ course, onUpdate, onRemove, onMoveClick, yearId, term, open
             title="Remove course"
             className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm px-2 focus:outline-none"
           >
-            ×
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>

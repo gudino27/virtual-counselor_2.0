@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Calendar } from 'lucide-react';
 
 export default function CourseDestinationPicker({ show, onClose, course, currentYear, currentTerm, years, onMove }) {
   const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -88,7 +89,7 @@ export default function CourseDestinationPicker({ show, onClose, course, current
                   }`}
                 >
                   <div className="text-center">
-                    <div className="text-2xl mb-1">📅</div>
+                    <div className="text-2xl mb-1"><Calendar className="w-6 h-6 mx-auto" /></div>
                     <div className="font-semibold text-sm">{year.name}</div>
                   </div>
                 </button>

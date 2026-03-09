@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { X } from 'lucide-react';
 import { calculateGPA, gradeToGPA, percentageToGrade, gradeToPercentage } from '../utils/gpaCalculator';
 
 function GPACalculator() {
@@ -80,7 +81,7 @@ function GPACalculator() {
                 className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
                 aria-label="Remove course"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
           ))}

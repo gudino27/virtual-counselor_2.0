@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 import CourseRow, { GRADE_POINTS } from './CourseRow';
 
 // Term Card Component
@@ -108,7 +109,7 @@ function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, ope
       <div className="text-sm text-gray-600 mb-3">
         {totalCredits} credits
         {totalCredits > 23 && (
-          <div className="text-xs text-orange-600 mt-1">⚠️ Advisor approval required</div>
+          <div className="text-xs text-orange-600 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Advisor approval required</div>
         )}
       </div>
 

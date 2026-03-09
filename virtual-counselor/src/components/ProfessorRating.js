@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { X } from 'lucide-react';
 export default function ProfessorRating({ name }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -112,7 +113,7 @@ export default function ProfessorRating({ name }) {
           <div className="relative bg-white rounded-xl shadow-lg max-w-md w-full mx-4 p-4 overflow-hidden ring-1 ring-black/5">
             <div className="flex justify-between items-start">
               <h3 className="text-lg font-semibold">{name} — Rating</h3>
-              <button aria-label="Close" onClick={handleClose} className="ml-2 text-gray-500 hover:text-gray-700">✕</button>
+              <button aria-label="Close" onClick={handleClose} className="ml-2 text-gray-500 hover:text-gray-700"><X className="w-4 h-4" /></button>
             </div>
             <div className="mt-3 text-sm text-gray-800">
               {loading && <div className="text-gray-600">Loading…</div>}

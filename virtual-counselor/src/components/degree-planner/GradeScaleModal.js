@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { GRADE_POINTS } from './CourseRow';
 
 function GradeScaleModal({ show, onClose }) {
@@ -24,7 +25,7 @@ function GradeScaleModal({ show, onClose }) {
             className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded p-1"
             aria-label="Close grade scale"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 

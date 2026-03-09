@@ -94,7 +94,7 @@ app.use('/api/', apiLimiter);
 
 // Webhook rate limiting can be disabled by setting WEBHOOK_RATE_LIMIT_MAX=0
 if (parseInt(process.env.WEBHOOK_RATE_LIMIT_MAX, 10) === 0) {
-  console.log('⚠️ Webhook rate limiting DISABLED via WEBHOOK_RATE_LIMIT_MAX=0');
+  console.log('[WARN] Webhook rate limiting DISABLED via WEBHOOK_RATE_LIMIT_MAX=0');
 } else {
   app.use('/webhook/', webhookLimiter);
 }
@@ -398,7 +398,7 @@ db.serialize(() => {
     if (err && !err.message.includes('duplicate column')) {
       console.error('Warning: Could not add external_id column:', err.message);
     } else if (!err) {
-      console.log('✅ Added external_id column to catalog_degrees');
+      console.log('[OK] Added external_id column to catalog_degrees');
     }
   });
   
@@ -508,7 +508,7 @@ db.serialize(() => {
   db.run('ALTER TABLE catalog_certificates ADD COLUMN required_courses TEXT', () => {});
   db.run('ALTER TABLE catalog_certificates ADD COLUMN elective_courses TEXT', () => {});
 
-  console.log('✅ Database tables created/verified');
+  console.log('[OK] Database tables created/verified');
 });
 
 // ============================================
@@ -628,7 +628,7 @@ async function importHistoricalCatalogData() {
 
   // Check if catalog directory exists
   if (!fs.existsSync(catalogDir)) {
-    console.log('📁 No pdf-archieved-catalog directory found, skipping historical import');
+    console.log('[INFO] No pdf-archieved-catalog directory found, skipping historical import');
     return;
   }
 
@@ -647,16 +647,16 @@ async function importHistoricalCatalogData() {
 
     // If we already have substantial data WITH courses, skip import
     if ((minorCheck?.count || 0) > 100 && (certCheck?.count || 0) > 50 && (minorCoursesCheck?.count || 0) > 50) {
-      console.log(`📚 Historical catalog data already populated (${minorCheck.count} minors, ${certCheck.count} certificates with narratives, ${minorCoursesCheck.count} with courses)`);
+      console.log(`[INFO] Historical catalog data already populated (${minorCheck.count} minors, ${certCheck.count} certificates with narratives, ${minorCoursesCheck.count} with courses)`);
       return;
     }
 
     // If data exists but courses are missing, we'll re-import to add courses
     if ((minorCheck?.count || 0) > 100 && (minorCoursesCheck?.count || 0) < 50) {
-      console.log('📚 Re-importing historical catalog data to add extracted courses...');
+      console.log('[INFO] Re-importing historical catalog data to add extracted courses...');
     }
 
-    console.log('📚 Importing historical catalog data from PDF archives...');
+    console.log('[INFO] Importing historical catalog data from PDF archives...');
 
     // Find all parsed JSON files
     const jsonFiles = fs.readdirSync(catalogDir)
@@ -725,9 +725,9 @@ async function importHistoricalCatalogData() {
       }
     }
 
-    console.log(`  ✅ Imported ${totalMinors} minors and ${totalCerts} certificates from ${jsonFiles.length} catalog years`);
+    console.log(`  [OK] Imported ${totalMinors} minors and ${totalCerts} certificates from ${jsonFiles.length} catalog years`);
   } catch (err) {
-    console.error('  ⚠️ Error importing historical catalog data:', err.message);
+    console.error('  [WARN] Error importing historical catalog data:', err.message);
   }
 }
 
@@ -967,7 +967,7 @@ app.get('/api/degree-requirements', async (req, res) => {
       
       if (requirements.length > 0) {
         // We have saved requirements - use them!
-        console.log(`✅ Loaded ${requirements.length} course requirements from database for "${name}"`);
+        console.log(`[OK] Loaded ${requirements.length} course requirements from database for "${name}"`);
         
         // Group by year and term
         const coursesByYearTerm = {};
@@ -1030,7 +1030,7 @@ app.get('/api/degree-requirements', async (req, res) => {
     
     // STEP 2: For minors/certificates found in DB but without requirements, return basic info
     if (dbDegree && (type === 'minor' || type === 'certificate')) {
-      console.log(`️ Found ${type} "${name}" in database (no detailed requirements available)`);
+      console.log(`[INFO] Found ${type} "${name}" in database (no detailed requirements available)`);
       // Certificates use 'description' field, minors use 'narrative'
       const narrativeText = dbDegree.narrative || dbDegree.description || `This ${type} requires specific courses. Please consult with your advisor.`;
 
@@ -1069,7 +1069,7 @@ app.get('/api/degree-requirements', async (req, res) => {
     }
 
     // STEP 3: Fall back to WSU API if not in database (degrees only)
-    console.log(`⚠️ No saved requirements for "${name}", fetching from WSU API...`);
+    console.log(`[WARN] No saved requirements for "${name}", fetching from WSU API...`);
 
     // For minors/certificates not in our DB, return a helpful error
     if (type === 'minor' || type === 'certificate') {
@@ -1798,7 +1798,7 @@ app.post('/webhook/courses', webhookAuth, async (req, res) => {
       });
     }
 
-    console.log(`📊 Processing ${courseData.length} courses (chunked commit)`);
+    console.log(`[INFO] Processing ${courseData.length} courses (chunked commit)`);
 
     let added = 0;
     let updated = 0;
@@ -1816,7 +1816,7 @@ app.post('/webhook/courses', webhookAuth, async (req, res) => {
         for (const course of chunk) {
           try {
             if (!course || !course.campus || !course.term || !course.year) {
-              console.log('⚠️  Skipping invalid course data');
+              console.log('[WARN] Skipping invalid course data');
               continue;
             }
 
@@ -1978,7 +1978,7 @@ app.post('/webhook/courses', webhookAuth, async (req, res) => {
 
     const duration = Date.now() - startTime;
 
-    console.log(`✅ Processed in ${duration}ms (${added} added, ${updated} updated, ${historyRecorded} history records, ${failed} failed)`);
+    console.log(`[OK] Processed in ${duration}ms (${added} added, ${updated} updated, ${historyRecorded} history records, ${failed} failed)`);
 
     res.json({
       status: 'success',
@@ -1991,7 +1991,7 @@ app.post('/webhook/courses', webhookAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error processing courses:', error);
+    console.error('[ERROR] Error processing courses:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -2009,7 +2009,7 @@ app.post('/webhook/catalog-pdf', webhookAuth, async (req, res) => {
     for (const pdf of pdfData) {
       try {
         if (!pdf || !pdf.filename || !pdf.catalogYear) {
-          console.log('⚠️  Skipping invalid PDF data - missing filename or catalogYear');
+          console.log('[WARN] Skipping invalid PDF data - missing filename or catalogYear');
           continue;
         }
 
@@ -2036,7 +2036,7 @@ app.post('/webhook/catalog-pdf', webhookAuth, async (req, res) => {
             pdf.filename
           ]);
           updated++;
-          console.log(`📄 Updated PDF: ${pdf.filename}`);
+          console.log(`[INFO] Updated PDF: ${pdf.filename}`);
         } else {
           // Insert new PDF
           await dbRun(`
@@ -2051,7 +2051,7 @@ app.post('/webhook/catalog-pdf', webhookAuth, async (req, res) => {
             pdf.pdfData ? Buffer.from(pdf.pdfData, 'base64') : null
           ]);
           added++;
-          console.log(`📄 Added PDF: ${pdf.filename}`);
+          console.log(`[INFO] Added PDF: ${pdf.filename}`);
         }
       } catch (pdfError) {
         console.error(`Error processing PDF ${pdf.filename}:`, pdfError.message);
@@ -2216,7 +2216,7 @@ app.post('/webhook/department', webhookAuth, async (req, res) => {
       ]);
       deptId = existingDept.id;
       deptUpdated = 1;
-      console.log(`📝 Updated department: ${dept.name} (${catalogYear})`);
+      console.log(`[INFO] Updated department: ${dept.name} (${catalogYear})`);
     } else {
       const result = await dbRun(`
         INSERT INTO departments (uniqueId, catalogYear, academicUnitId, name, title, fullName, url, location, phone, facultyList, description, sourceType)
@@ -2228,7 +2228,7 @@ app.post('/webhook/department', webhookAuth, async (req, res) => {
       ]);
       deptId = result.lastID;
       deptAdded = 1;
-      console.log(`✅ Added department: ${dept.name} (${catalogYear})`);
+      console.log(`[OK] Added department: ${dept.name} (${catalogYear})`);
     }
     
     // 2. UPSERT DEGREE PROGRAMS
@@ -2335,7 +2335,7 @@ app.post('/webhook/department', webhookAuth, async (req, res) => {
     
     const duration = Date.now() - startTime;
     
-    console.log(`📊 ${dept.name} (${catalogYear}): ${degreesAdded + degreesUpdated} degrees, ${minorsAdded + minorsUpdated} minors, ${certsAdded + certsUpdated} certs [${duration}ms]`);
+    console.log(`[INFO] ${dept.name} (${catalogYear}): ${degreesAdded + degreesUpdated} degrees, ${minorsAdded + minorsUpdated} minors, ${certsAdded + certsUpdated} certs [${duration}ms]`);
     
     res.json({
       status: 'success',
@@ -2354,7 +2354,7 @@ app.post('/webhook/department', webhookAuth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Error processing department:', error);
+    console.error('[ERROR] Error processing department:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -2862,14 +2862,14 @@ app.post('/webhook/catalog-programs', webhookAuth, async (req, res) => {
     try {
       const repairResult = await repairCatalogPrereqs(catalogYear);
       if (repairResult && repairResult.updated) {
-        console.log(`🔧 Repaired ${repairResult.updated} prerequisite_codes for catalog year ${catalogYear}`);
+        console.log(`[INFO] Repaired ${repairResult.updated} prerequisite_codes for catalog year ${catalogYear}`);
         results.repaired = repairResult.updated;
       }
     } catch (err) {
       console.error('Repair step failed:', err);
     }
     
-    console.log(`📥 Catalog programs saved for ${catalogYear}: ${results.added.degrees} degrees, ${results.added.minors} minors, ${results.added.certificates} certificates`);
+    console.log(`[INFO] Catalog programs saved for ${catalogYear}: ${results.added.degrees} degrees, ${results.added.minors} minors, ${results.added.certificates} certificates`);
     
     res.json({
       status: 'success',
