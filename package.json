@@ -18,20 +18,19 @@
   "license": "MIT",
   "dependencies": {
     "@domattheshack/rate-my-professors": "^2.2.1",
-    "axios": "^1.6.2",
-    "better-sqlite3": "^9.2.2",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
+    "axios": "^1.15.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.2.1",
+    "express-rate-limit": "^8.3.2",
     "helmet": "^8.1.0",
     "sqlite3": "^5.1.7",
     "winston": "^3.19.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.1.14"
   },
   "engines": {
     "node": ">=18.0.0"

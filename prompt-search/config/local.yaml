@@ -1,0 +1,13 @@
+llm:
+  provider: local
+  model_path: "${LOCAL_MODEL_PATH}"
+  model_name: llama-3.1-8b-q4
+  context_length: 2048
+  n_threads: 4
+  # n_gpu_layers is auto-detected at runtime based on available VRAM
+  # Jaime local computer: RTX 3070 (8GB): 35 layers offloaded to GPU
+  use_mlock: true
+
+rate_limiter:
+  requests_per_minute: 1000
+  tokens_per_minute: 1000000

@@ -1,0 +1,53 @@
+{
+  "sweep": [
+    {
+      "label": "faiss  + reranker, few_shot=3",
+      "use_hybrid": false,
+      "few_shot_n": 3,
+      "accuracy": 0.8,
+      "elapsed_s": 70.0
+    },
+    {
+      "label": "faiss  + reranker, few_shot=6",
+      "use_hybrid": false,
+      "few_shot_n": 6,
+      "accuracy": 0.825,
+      "elapsed_s": 69.5
+    },
+    {
+      "label": "faiss  + reranker, few_shot=12",
+      "use_hybrid": false,
+      "few_shot_n": 12,
+      "accuracy": 0.8,
+      "elapsed_s": 77.3
+    },
+    {
+      "label": "hybrid + reranker, few_shot=3",
+      "use_hybrid": true,
+      "few_shot_n": 3,
+      "accuracy": 0.75,
+      "elapsed_s": 70.5
+    },
+    {
+      "label": "hybrid + reranker, few_shot=6",
+      "use_hybrid": true,
+      "few_shot_n": 6,
+      "accuracy": 0.8,
+      "elapsed_s": 67.5
+    },
+    {
+      "label": "hybrid + reranker, few_shot=12",
+      "use_hybrid": true,
+      "few_shot_n": 12,
+      "accuracy": 0.75,
+      "elapsed_s": 68.1
+    }
+  ],
+  "best": {
+    "label": "faiss  + reranker, few_shot=6",
+    "use_hybrid": false,
+    "few_shot_n": 6,
+    "accuracy": 0.825,
+    "elapsed_s": 69.5
+  }
+}

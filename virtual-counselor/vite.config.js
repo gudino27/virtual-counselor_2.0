@@ -3,18 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  esbuild: {
-    loader: 'jsx',
-    include: /src\/.*\.jsx?$/,
-    exclude: []
-  },
-  optimizeDeps: {
-    esbuildOptions: {
-      loader: {
-        '.js': 'jsx',
-      },
-    },
-  },
   server: {
     port: 3007,
     proxy: {
@@ -32,6 +20,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/setupTests.js',
-    css: true
+    css: true,
+    // Exclude Playwright e2e specs — those run via `npx playwright test`, not vitest
+    exclude: ['**/node_modules/**', '**/tests/e2e/**'],
   }
 })

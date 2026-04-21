@@ -1,7 +1,10 @@
 # Frontend Dockerfile - Multi-stage build
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
+
+# Install build tools needed for native node modules on Alpine + Python 3.12+
+RUN apk add --no-cache python3 py3-setuptools make g++
 
 # Copy package files
 COPY package*.json ./

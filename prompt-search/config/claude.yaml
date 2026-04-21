@@ -1,0 +1,12 @@
+llm:
+  provider: claude
+  # claude-haiku-4-5  — cheapest, best for high-volume search evaluation loops
+  # claude-sonnet-4-6 — better reasoning, use for final evaluation runs
+  model: claude-haiku-4-5
+  api_key: "${ANTHROPIC_API_KEY}"
+  temperature: 0.7
+  max_tokens: 500
+
+rate_limiter:
+  requests_per_minute: 500
+  tokens_per_minute: 100000

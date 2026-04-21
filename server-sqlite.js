@@ -11,7 +11,7 @@ const axios = require('axios');
 
 // Security: Validate required environment variables
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
-      
+const { executeNotebook } = require('./prompt-search/scripts/execute_notebook');      
 
 if (!WEBHOOK_SECRET) {
   logger.error('WEBHOOK_SECRET not set! Please set it in .env.production before starting.');
@@ -877,20 +877,29 @@ app.get('/api/degrees', async (req, res) => {
     }
     
     const whereClause = 'WHERE ' + whereClauses.join(' AND ');
-    
+
+    // Union catalog_degrees with catalog_minors and catalog_certificates so all programs appear
     const allDegrees = await dbAll(`
       SELECT id, catalog_year, name, credits, degree_type, college, url, source_type, external_id, narrative
-      FROM catalog_degrees 
+      FROM catalog_degrees
+      ${whereClause}
+      UNION
+      SELECT id, catalog_year, name, NULL as credits, 'minor' as degree_type, NULL as college, url, source_type, NULL as external_id, narrative
+      FROM catalog_minors
+      ${whereClause}
+      UNION
+      SELECT id, catalog_year, name, NULL as credits, 'certificate' as degree_type, NULL as college, url, source_type, NULL as external_id, description as narrative
+      FROM catalog_certificates
       ${whereClause}
       ORDER BY name, source_type DESC
-    `, params);
-    
-    // Deduplicate by name (case-insensitive), preferring 'api' over 'catalog_json'
+    `, [...params, ...params, ...params]);
+
+    // Deduplicate by name+type (case-insensitive), preferring 'api' over 'catalog_json'
     const deduped = new Map();
     for (const degree of allDegrees) {
-      const key = degree.name.toLowerCase();
+      const key = `${degree.name.toLowerCase()}||${degree.degree_type}`;
       const existing = deduped.get(key);
-      
+
       // Keep this entry if: no existing entry, or this is from API and existing is from catalog_json
       if (!existing || (degree.source_type === 'api' && existing.source_type === 'catalog_json')) {
         deduped.set(key, degree);
@@ -931,9 +940,15 @@ app.get('/api/degrees', async (req, res) => {
 // First tries database (for saved requirements), then falls back to WSU API
 app.get('/api/degree-requirements', async (req, res) => {
   try {
-    const { name, acadUnitId: providedAcadUnitId, type = 'degree' } = req.query;
+    const rawType = req.query.type;
+    const type = typeof rawType === 'string' ? rawType : 'degree';
+    const { name, acadUnitId: providedAcadUnitId } = req.query;
 
-    if (!name) {
+    if (!['degree', 'minor', 'certificate'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid type parameter' });
+    }
+
+    if (!name || typeof name !== 'string') {
       return res.status(400).json({ error: 'Degree name is required' });
     }
 
@@ -1107,8 +1122,15 @@ app.get('/api/degree-requirements', async (req, res) => {
       acadUnitId = degreeInfo.acadUnitId;
     }
     
+    // Parse to integer — rejects any non-numeric value including strings with path chars.
+    // Using the parsed integer (not the original string) in the URL prevents SSRF.
+    const safeUnitId = parseInt(String(acadUnitId), 10);
+    if (!Number.isFinite(safeUnitId) || safeUnitId <= 0) {
+      return res.status(400).json({ error: 'Invalid academic unit ID' });
+    }
+
     // Fetch the academic unit data which includes course requirements
-    const unitResponse = await fetch(`https://catalog.wsu.edu/api/Data/GetAcademicUnit/${acadUnitId}/General`);
+    const unitResponse = await fetch(`https://catalog.wsu.edu/api/Data/GetAcademicUnit/${safeUnitId}/General`);
     const unitData = await unitResponse.json();
     
     // Find the specific degree program
@@ -2054,7 +2076,7 @@ app.post('/webhook/catalog-pdf', webhookAuth, async (req, res) => {
           console.log(`[INFO] Added PDF: ${pdf.filename}`);
         }
       } catch (pdfError) {
-        console.error(`Error processing PDF ${pdf.filename}:`, pdfError.message);
+        console.error('Error processing PDF:', pdf.filename, pdfError.message);
       }
     }
 
@@ -2133,7 +2155,7 @@ app.post('/webhook/degrees', webhookAuth, async (req, res) => {
 
         added++;
       } catch (degreeError) {
-        console.error(`Error processing degree ${degree.name}:`, degreeError.message);
+        console.error('Error processing degree:', degree.name, degreeError.message);
       }
     }
 
@@ -2752,29 +2774,36 @@ app.post('/webhook/catalog-programs', webhookAuth, async (req, res) => {
     // Helper: extract course codes from free text (fallback when prereq arrays are missing)
     const extractCourseCodes = (text) => {
       if (!text || typeof text !== 'string') return [];
-      // Find tokens like 'CPTS 121', 'CPT S 121', 'MATH 171', etc.
-      // Allow optional spaces inside alpha portion and optional punctuation.
-      const re = /([A-Za-z]{1,8}(?:\s+[A-Za-z])?(?:\s*)[-–:]?\s*\d{3})/g;
-      const matches = [];
-      const blacklist = new Set(['OR', 'AND', 'ONE', 'BY', 'WITH', 'A', 'THE', 'OR,']);
-      let m;
-      while ((m = re.exec(text)) !== null) {
-        let code = m[1].toUpperCase();
-        // Normalize spaces inside the alpha part: e.g. 'CPT S 121' -> 'CPTS 121'
-        code = code.replace(/([A-Z])\s+(?=[A-Z])/g, '$1');
-        // Collapse multiple spaces
-        code = code.replace(/\s+/g, ' ');
-        // Ensure format PREFIX NUMBER
-        const parts = code.split(' ');
-        if (parts.length >= 2) {
-          const num = parts.pop();
-          const prefix = parts.join('').replace(/[^A-Z]/g, '');
-          if (!prefix || prefix.length < 2) continue; // ignore tiny prefixes
-          if (blacklist.has(prefix)) continue;
-          // basic sanity: number should be 3 digits
-          if (!/^\d{3}$/.test(num)) continue;
-          matches.push(`${prefix} ${num}`);
+
+      // Step 1: normalize underscore/dash separators between prefix and number
+      // e.g. CPTS_121 -> CPTS 121, MATH-171 -> MATH 171
+      let normalized = text.replace(/([A-Za-z]{2,8})[_-](\d{3})\b/g, '$1 $2');
+
+      // Step 2: expand continuation numbers — "CPTS 121 or 223" -> "CPTS 121 or CPTS 223"
+      // Handles comma/and/or and combinations like ", or 220"
+      normalized = normalized.replace(
+        /\b([A-Za-z]{2,8}(?:\s[A-Za-z]{1,4})?)\s+(\d{3})\b((?:\s*(?:[,;]|\bor\b|\band\b)(?:\s*(?:\bor\b|\band\b))?\s*\d{3}\b)+)/gi,
+        (_match, prefix, firstNum, rest) => {
+          const expanded = rest.replace(/(\d{3})/g, `${prefix} $1`);
+          return `${prefix} ${firstNum}${expanded}`;
         }
+      );
+
+      // Step 3: match all course code tokens.
+      // Negative lookahead blocks matches that start with a conjunction (or, and, by, …)
+      // so the engine finds the real prefix on the next attempt rather than skipping it.
+      // Supports split prefixes up to 4 chars (CPT S, E E, CON E, CST M, BIO ENG).
+      // (?!\d) prevents partial matches of 4-digit numbers.
+      const re = /\b(?!(?:or|and|one|by|with|the|of|in|to|for)\b)([A-Za-z]{1,8}(?:\s[A-Za-z]{1,4})?\s*\d{3})(?!\d)/gi;
+      const matches = [];
+      let m;
+      while ((m = re.exec(normalized)) !== null) {
+        const words = m[1].trim().toUpperCase().split(/\s+/);
+        const num = words[words.length - 1];
+        const prefix = words.slice(0, -1).join('').replace(/[^A-Z]/g, '');
+        if (!prefix || prefix.length < 2) continue;
+        if (!/^\d{3}$/.test(num)) continue;
+        matches.push(`${prefix} ${num}`);
       }
       // Deduplicate preserving order
       return [...new Set(matches)];
@@ -3008,12 +3037,13 @@ app.get('/api/catalog/courses', async (req, res) => {
 // Search across all catalog years
 app.get('/api/catalog/search', async (req, res) => {
   try {
-    const { q, type, year } = req.query;
-    
-    if (!q || q.length < 2) {
+    const q = typeof req.query.q === 'string' ? req.query.q : '';
+    const { type, year } = req.query;
+
+    if (q.length < 2) {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
-    
+
     const searchTerm = `%${q}%`;
     const results = { degrees: [], minors: [], certificates: [] };
     
@@ -3058,6 +3088,125 @@ app.get('/api/catalog/search', async (req, res) => {
     console.error('Error searching catalog:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Guardrail 1: Rate Limiter (Max 20 requests per hour)
+const llmRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,
+  message: { error: 'rate_limit_exceeded', message: 'Maximum 20 LLM requests per hour allowed.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Guardrail 2: Input Sanitization
+const sanitizeLlmInput = (req, res, next) => {
+  const sanitizeStr = (str) => {
+    if (typeof str !== 'string') return str;
+    return str
+      .replace(/[\x00-\x1F\x7F-\x9F]/g, "") // Strip null bytes & control chars
+      .replace(/<[^>]*>?/gm, '');           // Strip HTML/script tags
+  };
+
+  if (req.body) {
+    if (req.body.question) {
+      req.body.question = sanitizeStr(req.body.question);
+      if (req.body.question.length > 500) {
+        return sendBadRequest(res, "payload_too_large", "Question exceeds 500 characters limit.");
+      }
+    }
+    if (req.body.query) {
+      req.body.query = sanitizeStr(req.body.query);
+      if (req.body.query.length > 500) {
+        return sendBadRequest(res, "payload_too_large", "Query exceeds 500 characters limit.");
+      }
+    }
+  }
+  next();
+};
+
+// Guardrail 3: Topic Classification Prompt
+async function isLlmTopicAllowed(question) {
+    const courseRegex = /[A-Z]{2,4}\s*S?\s*\d{3}/i;
+    if (courseRegex.test(question)) return true;
+
+    try {
+        const result = await executeNotebook('notebooks/production/api_advice.ipynb', {
+            question: `Is this question about WSU academic advising, courses, or degree planning? Answer ONLY with YES or NO. Question: "${question}"`,
+            use_rag: false 
+        });
+        
+        // If NO, return 400 with {error: "off_topic"}
+        const answer = result.answer.trim().toUpperCase();
+        return answer.includes("YES");
+    } catch (e) {
+        return true; // Failsafe to avoid blocking users on server errors
+    }
+}
+
+// 1. LLM Health Check
+app.get('/api/llm-health', (req, res) => {
+  const modelPath = path.resolve(__dirname, 'data/models/llama-3.1-8b-q4.gguf');
+  
+  if (fs.existsSync(modelPath)) {
+    res.json({ status: "healthy", model_path: modelPath });
+  } else {
+    // We return a standard JSON instead of a 404/500 so the frontend can read the status gracefully
+    res.json({ status: "model_not_found", model_path: modelPath });
+  }
+});
+
+// 2. Main Advising Endpoint
+app.post('/api/llm-advice', llmRateLimiter, sanitizeLlmInput, async (req, res) => {
+  const { question, studentContext, student_context, use_rag = true } = req.body;
+  const resolvedContext = studentContext || student_context || {};
+
+  if (!question) {
+    return res.status(400).json({ error: "bad_request", message: "Question is missing." });
+  }
+
+  try {
+    const notebookPath = path.join(__dirname, 'notebooks', 'production', 'api_advice.ipynb');
+
+    // Fast regex guardrail — no LLM call needed for topic classification
+    const ALLOWED_TOPIC_RE = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite|take|register|enroll|graduat|semester|gpa|grade|catalog|requirement|curriculum|transfer|minor|certificate|meet|seat|open|section|offered|available|instructor|waitlist|when\s+is|what\s+time|[a-z]{2,6}(\s+[a-z]{1,2})?\s*\d{3}/i;
+    console.log(`\n[guardrail] Running check...`);
+    if (!ALLOWED_TOPIC_RE.test(question)) {
+        console.log(`[guardrail] Blocked off-topic question: "${question}"`);
+        return res.status(400).json({
+            error: "off_topic",
+            message: "I can only answer questions related to WSU academic advising, courses, or degree planning."
+        });
+    }
+    console.log(`[guardrail] Passed. Processing advising request...`);
+    const result = await executeNotebook(notebookPath, { question, student_context: resolvedContext, use_rag });
+    
+    return res.status(200).json(result);
+
+  } catch (error) {
+    console.error("Error executing notebook:", error);
+    return res.status(200).json({
+      answer: "I'm having trouble accessing course information right now. Please try again in a moment or contact your academic advisor directly.",
+      sources: [],
+      metadata: { error: true }
+    });
+  }
+});
+
+app.post('/api/llm-search-courses', sanitizeLlmInput, async (req, res) => {
+    const { query, top_k = 5 } = req.body;
+    if (!query) return res.status(400).json({ error: "Query is missing." });
+
+    try {
+        const result = await executeNotebook('notebooks/production/api_search_courses.ipynb', { 
+            question: query, 
+            top_k 
+        });
+        res.json(result);
+    } catch (error) {
+        logger.error('LLM Course Search Error', { meta: { error: error.message } });
+        sendServerError(res, error);    
+      }
 });
 
 // Error handling middleware

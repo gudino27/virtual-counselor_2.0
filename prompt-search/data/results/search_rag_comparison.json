@@ -1,0 +1,82 @@
+{
+  "best_mutation_path": "base",
+  "beam_search_history": [
+    {
+      "iteration": 1,
+      "best_accuracy": 0.0,
+      "beam_accuracies": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "best_path": "add_cot"
+    },
+    {
+      "iteration": 2,
+      "best_accuracy": 0.0,
+      "beam_accuracies": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "best_path": "add_cot -> add_cot"
+    }
+  ],
+  "overall": {
+    "baseline": 0.3,
+    "search_only": 0.525,
+    "rag_only": 0.775,
+    "search_rag": 0.725
+  },
+  "by_category": [
+    {
+      "category": "credit_calculations",
+      "baseline": 0.5,
+      "search_only": 0.65,
+      "rag_only": 0.75,
+      "search_rag": 0.75
+    },
+    {
+      "category": "degree_progress",
+      "baseline": 0.25,
+      "search_only": 0.3,
+      "rag_only": 0.6,
+      "search_rag": 0.65
+    },
+    {
+      "category": "prerequisite_chain_discovery",
+      "baseline": 0.32,
+      "search_only": 0.44,
+      "rag_only": 0.8,
+      "search_rag": 0.68
+    },
+    {
+      "category": "prerequisite_validation",
+      "baseline": 0.1667,
+      "search_only": 0.6333,
+      "rag_only": 0.9333,
+      "search_rag": 0.8
+    },
+    {
+      "category": "schedule_feasibility",
+      "baseline": 0.2667,
+      "search_only": 0.4667,
+      "rag_only": 0.6,
+      "search_rag": 0.6667
+    },
+    {
+      "category": "ucore_planning",
+      "baseline": 0.4,
+      "search_only": 0.7,
+      "rag_only": 0.9,
+      "search_rag": 0.8
+    }
+  ],
+  "self_consistency": {
+    "samples": 5,
+    "subset_size": 20,
+    "rag_only_acc": 0.9,
+    "sc_rag_acc": 0.9,
+    "delta": 0.0
+  }
+}

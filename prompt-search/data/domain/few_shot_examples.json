@@ -1,0 +1,100 @@
+{
+  "metadata": {
+    "purpose": "Few-shot exemplars for prompting the virtual counselor LLM. Each example shows the expected reasoning style: cite prereqs, compare against the student's completed courses, then produce a short grounded answer.",
+    "institution": "Washington State University",
+    "count": 12
+  },
+  "examples": [
+    {
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 483 (capstone) now?",
+      "context": {"completed_courses": ["CPTS 121", "CPTS 122", "CPTS 223", "CPTS 322"]},
+      "reasoning": "CPTS 483 is the senior design capstone. It requires CPTS 322 (met) AND senior standing (90+ credits).",
+      "answer": "Yes for course prerequisites (CPTS 322 required), but CPTS 483 also requires senior standing (90+ credits completed)."
+    },
+    {
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 360 if I've finished CPTS 121, 122, 223, and MATH 171?",
+      "context": {"completed_courses": ["CPTS 121", "CPTS 122", "CPTS 223", "MATH 171"]},
+      "reasoning": "CPTS 360 prerequisites are CPTS 223 and CPTS 260. The student has CPTS 223 but not CPTS 260. CPTS 260 requires CPTS 121 and MATH 171, which the student has completed, so CPTS 260 is the next step.",
+      "answer": "Not yet. You need CPTS 260 first; you already qualify for it. After CPTS 260 you will be eligible for CPTS 360."
+    },
+    {
+      "category": "prerequisite_chain_discovery",
+      "question": "What do I need before CPTS 437?",
+      "context": {"completed_courses": []},
+      "reasoning": "CPTS 437 requires CPTS 315 or STAT 360. STAT 360 is the common CS path and requires MATH 172, which requires MATH 171.",
+      "answer": "You need STAT 360 (or CPTS 315). The shortest path: MATH 171 -> MATH 172 -> STAT 360 -> CPTS 437."
+    },
+    {
+      "category": "credit_calculations",
+      "question": "How many credits remain if I have 78?",
+      "context": {"credits_earned": 78, "degree": "Computer Science"},
+      "reasoning": "CS BS requires 120 credits. 120 minus 78 equals 42.",
+      "answer": "42 credits remain for the CS BS."
+    },
+    {
+      "category": "credit_calculations",
+      "question": "Do I meet the upper-division requirement with 36 UD credits?",
+      "context": {"upper_division_credits": 36},
+      "reasoning": "WSU requires 40 credits at the 300-level or above. The student has 36, so 4 are missing.",
+      "answer": "Not yet. You need 4 more upper-division credits to reach the 40-credit minimum."
+    },
+    {
+      "category": "schedule_feasibility",
+      "question": "Can I take CPTS 121 and CPTS 122 together?",
+      "context": {"proposed": ["CPTS 121", "CPTS 122"]},
+      "reasoning": "CPTS 122 lists CPTS 121 as a prerequisite, not a corequisite. They must be taken in sequence.",
+      "answer": "No. CPTS 122 requires CPTS 121 to be completed first."
+    },
+    {
+      "category": "schedule_feasibility",
+      "question": "Can CPTS 322, CPTS 355, and CPTS 360 go in one semester if CPTS 121, 122, 223, 260 are done?",
+      "context": {"proposed": ["CPTS 322", "CPTS 355", "CPTS 360"], "completed_courses": ["CPTS 121", "CPTS 122", "CPTS 223", "CPTS 260"]},
+      "reasoning": "CPTS 322 needs CPTS 223 (met), CPTS 355 needs CPTS 223 (met), CPTS 360 needs CPTS 223 and CPTS 260 (both met). Total is 9 CPTS credits, which is heavy but feasible.",
+      "answer": "Yes - all prerequisites are met. Be aware that three CPTS courses simultaneously is a heavy workload."
+    },
+    {
+      "category": "ucore_planning",
+      "question": "I've satisfied WRTG, QUAN, COMM, BSCI, and PSCI. What UCORE is left?",
+      "context": {"ucore_completed": ["WRTG", "QUAN", "COMM", "BSCI", "PSCI"]},
+      "reasoning": "Full UCORE set: WRTG, QUAN, COMM, BSCI, PSCI, SSCI, HUM, ARTS, DIVR, INTG/CAPS. Subtract completed.",
+      "answer": "Remaining: SSCI, HUM, ARTS, DIVR, INTG/CAPS."
+    },
+    {
+      "category": "ucore_planning",
+      "question": "Does CPTS 483 cover my CAPS UCORE?",
+      "context": {"course": "CPTS 483", "major": "Computer Science"},
+      "reasoning": "CPTS 483 is the senior design capstone for CS and is explicitly tagged as the INTG/CAPS UCORE for the major.",
+      "answer": "Yes. CPTS 483 satisfies the INTG/CAPS UCORE for CS majors."
+    },
+    {
+      "category": "degree_progress",
+      "question": "I've finished CPTS 121, 122, 223, 260, MATH 171, 172, and ENGL 101. What's next?",
+      "context": {"completed_courses": ["CPTS 121", "CPTS 122", "CPTS 223", "CPTS 260", "MATH 171", "MATH 172", "ENGL 101"]},
+      "reasoning": "Core CS foundation is done. Next unlocked: CPTS 317, 321, 322, 355, 360, 440. Math: MATH 216 or 220, STAT 360. Also need PHYSICS sequence and most UCORE categories.",
+      "answer": "Suggested next term: CPTS 322 and one of {317, 355, 440}, plus MATH 216 or STAT 360, and PHYSICS 201 if you have not started the physics sequence."
+    },
+    {
+      "category": "degree_progress",
+      "question": "Am I ready to apply for graduation with 119 credits?",
+      "context": {"credits_earned": 119},
+      "reasoning": "CS BS requires 120 credits. The student is one credit short.",
+      "answer": "Not quite. You are 1 credit short of the 120-credit minimum. Confirm UD count and UCORE completion as well."
+    },
+    {
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 451 after CPTS 355?",
+      "context": {"completed_courses": ["CPTS 121", "CPTS 122", "CPTS 223", "CPTS 355"]},
+      "reasoning": "CPTS 451 requires CPTS 322 or CPTS 355. CPTS 355 is complete, so the disjunction is satisfied.",
+      "answer": "Yes. CPTS 355 satisfies the CPTS 451 prerequisite."
+    },
+    {
+      "category": "prerequisite_chain_discovery",
+      "question": "Give me the full chain for CPTS 360.",
+      "context": {"target_course": "CPTS 360"},
+      "reasoning": "CPTS 360 needs CPTS 223 and CPTS 260. CPTS 223 chain: CPTS 121 -> CPTS 122 -> CPTS 223. CPTS 260 chain: CPTS 121 + MATH 171 -> CPTS 260.",
+      "answer": "CPTS 121 -> CPTS 122 -> CPTS 223, plus CPTS 121 + MATH 171 -> CPTS 260, then both feed CPTS 360."
+    }
+  ]
+}

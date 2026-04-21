@@ -1,0 +1,13 @@
+{
+  "baseline": {
+    "label": "FAISS top_k=3 (no reranker)",
+    "accuracy": 0.825,
+    "elapsed_s": 144.3
+  },
+  "reranked": {
+    "label": "FAISS top_k=12 + reranker",
+    "accuracy": 0.85,
+    "elapsed_s": 71.5
+  },
+  "delta": 0.025
+}
