@@ -1,0 +1,6 @@
+beam_width: 3
+max_iterations: 10
+patience: 2
+min_delta: 0.0
+temperature: 0.0
+max_tokens: 500

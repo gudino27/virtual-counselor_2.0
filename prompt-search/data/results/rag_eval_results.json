@@ -1,0 +1,51 @@
+{
+  "rag": {
+    "accuracy": 0.7667,
+    "avg_latency_s": 1.597,
+    "avg_tokens": 43312.8,
+    "avg_retrieval_precision": "n/a"
+  },
+  "no_rag": {
+    "accuracy": 0.3083,
+    "avg_latency_s": 0.008,
+    "avg_tokens": 0.0
+  },
+  "by_category": [
+    {
+      "category": "credit_calculations",
+      "rag_accuracy": 0.7,
+      "no_rag_accuracy": 0.5,
+      "delta": 0.2
+    },
+    {
+      "category": "degree_progress",
+      "rag_accuracy": 0.6,
+      "no_rag_accuracy": 0.4,
+      "delta": 0.2
+    },
+    {
+      "category": "prerequisite_chain_discovery",
+      "rag_accuracy": 0.8,
+      "no_rag_accuracy": 0.24,
+      "delta": 0.56
+    },
+    {
+      "category": "prerequisite_validation",
+      "rag_accuracy": 0.9,
+      "no_rag_accuracy": 0.1333,
+      "delta": 0.7667
+    },
+    {
+      "category": "schedule_feasibility",
+      "rag_accuracy": 0.6667,
+      "no_rag_accuracy": 0.2667,
+      "delta": 0.4
+    },
+    {
+      "category": "ucore_planning",
+      "rag_accuracy": 0.9,
+      "no_rag_accuracy": 0.5,
+      "delta": 0.4
+    }
+  ]
+}

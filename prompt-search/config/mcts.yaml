@@ -1,0 +1,4 @@
+num_iterations: 100
+exploration_weight: 1.414
+temperature: 0.0
+max_tokens: 500

@@ -1,0 +1,1901 @@
+{
+  "metadata": {
+    "total_cases": 120,
+    "institution": "Washington State University",
+    "degree_focus": "Computer Science (B.S.)",
+    "categories": {
+      "prerequisite_validation": 30,
+      "prerequisite_chain_discovery": 25,
+      "credit_calculations": 20,
+      "schedule_feasibility": 15,
+      "ucore_planning": 10,
+      "degree_progress": 20
+    },
+    "notes": "Expected answers reflect the WSU CS BS catalog and standard UCORE categories. Prereq chains and credit totals assume the 120-credit CS plan published in the 2023-2025 catalog."
+  },
+  "cases": [
+    {
+      "id": "prereq_001",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 122 if I have completed CPTS 121?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 122 requires CPTS 121 with a C or better, which you have satisfied.",
+      "reasoning_steps": [
+        "Look up prerequisites for CPTS 122",
+        "Confirmed prereq: CPTS 121",
+        "CPTS 121 is in completed_courses",
+        "All prereqs met -> eligible"
+      ]
+    },
+    {
+      "id": "prereq_002",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 223 with only CPTS 121 done?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121"
+        ]
+      },
+      "expected_answer": "No. CPTS 223 requires CPTS 122 (C or better). You must complete CPTS 122 first.",
+      "reasoning_steps": [
+        "CPTS 223 prereq: CPTS 122",
+        "CPTS 122 not in completed_courses",
+        "Missing prereq -> not eligible"
+      ]
+    },
+    {
+      "id": "prereq_003",
+      "category": "prerequisite_validation",
+      "question": "Am I eligible for CPTS 260 after finishing CPTS 121 and MATH 171?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 260 requires CPTS 121 and MATH 171; both are complete.",
+      "reasoning_steps": [
+        "CPTS 260 prereqs: CPTS 121, MATH 171",
+        "Both present in completed_courses",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_004",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 360 right now? I have CPTS 122 and CPTS 223.",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223"
+        ]
+      },
+      "expected_answer": "No. CPTS 360 requires CPTS 260 in addition to CPTS 223. Complete CPTS 260 first.",
+      "reasoning_steps": [
+        "CPTS 360 prereqs: CPTS 223, CPTS 260",
+        "CPTS 260 missing",
+        "Not eligible"
+      ]
+    },
+    {
+      "id": "prereq_005",
+      "category": "prerequisite_validation",
+      "question": "Can I enroll in CPTS 317?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "MATH 171",
+          "MATH 172"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 317 requires CPTS 223, which you have completed.",
+      "reasoning_steps": [
+        "CPTS 317 prereq: CPTS 223",
+        "CPTS 223 is completed",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_006",
+      "category": "prerequisite_validation",
+      "question": "Am I ready for CPTS 322 with CPTS 223 done?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 322 requires CPTS 223.",
+      "reasoning_steps": [
+        "CPTS 322 prereq: CPTS 223",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_007",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 323 without CPTS 322?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 317"
+        ]
+      },
+      "expected_answer": "No. CPTS 323 requires CPTS 322.",
+      "reasoning_steps": [
+        "CPTS 323 prereq: CPTS 322",
+        "CPTS 322 missing",
+        "Not eligible"
+      ]
+    },
+    {
+      "id": "prereq_008",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 355?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 355 requires CPTS 223.",
+      "reasoning_steps": [
+        "CPTS 355 prereq: CPTS 223",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_009",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 440 (AI) this semester?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 440 requires CPTS 223.",
+      "reasoning_steps": [
+        "CPTS 440 prereq: CPTS 223",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_010",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 437 (Machine Learning)?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "MATH 171",
+          "MATH 172"
+        ]
+      },
+      "expected_answer": "No. CPTS 437 requires CPTS 315 or STAT 360. Neither is complete.",
+      "reasoning_steps": [
+        "CPTS 437 prereq: CPTS 315 OR STAT 360",
+        "Neither satisfied",
+        "Not eligible"
+      ]
+    },
+    {
+      "id": "prereq_011",
+      "category": "prerequisite_validation",
+      "question": "Can I enroll in CPTS 451 (Databases)?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 322"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 451 requires CPTS 322 or CPTS 355; CPTS 322 satisfies this.",
+      "reasoning_steps": [
+        "CPTS 451 prereq: CPTS 322 OR CPTS 355",
+        "CPTS 322 satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_012",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 483 (capstone) now?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 322"
+        ]
+      },
+      "expected_answer": "Yes for prereqs (CPTS 322), but capstone also requires senior standing (90+ credits).",
+      "reasoning_steps": [
+        "CPTS 483 prereqs: CPTS 322 + senior standing",
+        "Course prereq satisfied",
+        "Senior standing check is context-dependent"
+      ]
+    },
+    {
+      "id": "prereq_013",
+      "category": "prerequisite_validation",
+      "question": "Can I take MATH 172?",
+      "context": {
+        "completed_courses": [
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "Yes. MATH 172 requires MATH 171.",
+      "reasoning_steps": [
+        "MATH 172 prereq: MATH 171",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_014",
+      "category": "prerequisite_validation",
+      "question": "Can I enroll in MATH 273 without MATH 172?",
+      "context": {
+        "completed_courses": [
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "No. MATH 273 requires MATH 172.",
+      "reasoning_steps": [
+        "MATH 273 prereq: MATH 172",
+        "MATH 172 missing",
+        "Not eligible"
+      ]
+    },
+    {
+      "id": "prereq_015",
+      "category": "prerequisite_validation",
+      "question": "Can I enroll in MATH 216 with MATH 172 completed?",
+      "context": {
+        "completed_courses": [
+          "MATH 171",
+          "MATH 172"
+        ]
+      },
+      "expected_answer": "Yes. MATH 216 (Discrete Structures) requires MATH 172.",
+      "reasoning_steps": [
+        "MATH 216 prereq: MATH 172",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_016",
+      "category": "prerequisite_validation",
+      "question": "Can I take STAT 360 this term?",
+      "context": {
+        "completed_courses": [
+          "MATH 171",
+          "MATH 172"
+        ]
+      },
+      "expected_answer": "Yes. STAT 360 requires MATH 172.",
+      "reasoning_steps": [
+        "STAT 360 prereq: MATH 172",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_017",
+      "category": "prerequisite_validation",
+      "question": "Can I take PHYSICS 202 after only PHYSICS 201?",
+      "context": {
+        "completed_courses": [
+          "PHYSICS 201",
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "Yes. PHYSICS 202 requires PHYSICS 201 and MATH 172 (or concurrent). Confirm MATH 172 enrollment.",
+      "reasoning_steps": [
+        "PHYSICS 202 prereqs: PHYSICS 201, MATH 172 (concurrent ok)",
+        "PHYSICS 201 done; MATH 172 status unknown",
+        "Conditionally eligible"
+      ]
+    },
+    {
+      "id": "prereq_018",
+      "category": "prerequisite_validation",
+      "question": "Can I enroll in ENGL 402 as a junior?",
+      "context": {
+        "completed_courses": [
+          "ENGL 101"
+        ],
+        "class_standing": "junior"
+      },
+      "expected_answer": "Yes. ENGL 402 requires ENGL 101 and junior standing, both met.",
+      "reasoning_steps": [
+        "ENGL 402 prereq: ENGL 101 + junior standing",
+        "Both satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_019",
+      "category": "prerequisite_validation",
+      "question": "Can I enroll in ENGL 402 as a sophomore?",
+      "context": {
+        "completed_courses": [
+          "ENGL 101"
+        ],
+        "class_standing": "sophomore"
+      },
+      "expected_answer": "No. ENGL 402 requires junior standing.",
+      "reasoning_steps": [
+        "ENGL 402 prereq: junior standing",
+        "Not met",
+        "Not eligible"
+      ]
+    },
+    {
+      "id": "prereq_020",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 121 as a freshman with no prior CS?",
+      "context": {
+        "completed_courses": []
+      },
+      "expected_answer": "Yes. CPTS 121 has no CS prerequisite; MATH 171 is recommended but not required.",
+      "reasoning_steps": [
+        "CPTS 121 has no hard prereq",
+        "Open entry",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_021",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 415 (Big Data) after CPTS 355?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 355"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 415 requires CPTS 355 or CPTS 451; CPTS 355 is complete.",
+      "reasoning_steps": [
+        "CPTS 415 prereq: CPTS 355 OR CPTS 451",
+        "CPTS 355 satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_022",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 487 without CPTS 322?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 355"
+        ]
+      },
+      "expected_answer": "No. CPTS 487 requires CPTS 322.",
+      "reasoning_steps": [
+        "CPTS 487 prereq: CPTS 322",
+        "Missing",
+        "Not eligible"
+      ]
+    },
+    {
+      "id": "prereq_023",
+      "category": "prerequisite_validation",
+      "question": "Can I enroll in CPTS 321 with CPTS 223 only?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 321 requires CPTS 223.",
+      "reasoning_steps": [
+        "CPTS 321 prereq: CPTS 223",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_024",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 466 (Numerical Methods)?",
+      "context": {
+        "completed_courses": [
+          "CPTS 122",
+          "MATH 172",
+          "MATH 220"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 466 requires CPTS 360. Full chain: CPTS 121 -> CPTS 122 -> CPTS 223 -> CPTS 260 -> CPTS 360 -> CPTS 466.",
+      "reasoning_steps": [
+        "CPTS 466 prereqs: CPTS 122, MATH 220",
+        "Both satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_025",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 489?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 322",
+          "CPTS 360"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 489 requires CPTS 322; CPTS 360 is recommended and also complete.",
+      "reasoning_steps": [
+        "CPTS 489 prereq: CPTS 322",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_026",
+      "category": "prerequisite_validation",
+      "question": "Can I enroll in CPTS 360 without CPTS 223?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 260"
+        ]
+      },
+      "expected_answer": "No. CPTS 360 requires CPTS 223 in addition to CPTS 260.",
+      "reasoning_steps": [
+        "CPTS 360 prereqs: CPTS 223, CPTS 260",
+        "CPTS 223 missing",
+        "Not eligible"
+      ]
+    },
+    {
+      "id": "prereq_027",
+      "category": "prerequisite_validation",
+      "question": "Can I take STAT 443?",
+      "context": {
+        "completed_courses": [
+          "MATH 171",
+          "MATH 172",
+          "STAT 360"
+        ]
+      },
+      "expected_answer": "Yes. STAT 443 requires STAT 360.",
+      "reasoning_steps": [
+        "STAT 443 prereq: STAT 360",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_028",
+      "category": "prerequisite_validation",
+      "question": "Am I eligible for PHYSICS 201 with MATH 171?",
+      "context": {
+        "completed_courses": [
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "Yes. PHYSICS 201 requires MATH 171 (or concurrent).",
+      "reasoning_steps": [
+        "PHYSICS 201 prereq: MATH 171",
+        "Satisfied",
+        "Eligible"
+      ]
+    },
+    {
+      "id": "prereq_029",
+      "category": "prerequisite_validation",
+      "question": "Can I take MATH 220 (Linear Algebra) without MATH 172?",
+      "context": {
+        "completed_courses": [
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "No. MATH 220 requires MATH 172.",
+      "reasoning_steps": [
+        "MATH 220 prereq: MATH 172",
+        "Missing",
+        "Not eligible"
+      ]
+    },
+    {
+      "id": "prereq_030",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 122 and CPTS 260 simultaneously if I just finished CPTS 121 and MATH 171?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 122 requires CPTS 121 (met) and CPTS 260 requires CPTS 121 + MATH 171 (met). Both can run concurrently.",
+      "reasoning_steps": [
+        "CPTS 122 prereq: CPTS 121 -> met",
+        "CPTS 260 prereqs: CPTS 121, MATH 171 -> met",
+        "Eligible for both"
+      ]
+    },
+    {
+      "id": "chain_001",
+      "category": "prerequisite_chain_discovery",
+      "question": "What courses must I complete before CPTS 360?",
+      "context": {
+        "target_course": "CPTS 360"
+      },
+      "expected_answer": "CPT S 360 requires CPT S 223 and CPT S 260. Chain: CPT S 121 -> CPT S 122 -> CPT S 223 (+ MATH 216); CPT S 223 -> CPT S 260.",
+      "reasoning_steps": [
+        "CPTS 360 direct prereqs: CPTS 223, CPTS 260",
+        "CPTS 223 chain: 121 -> 122 -> 223",
+        "CPTS 260 chain: 121 + MATH 171 -> 260"
+      ]
+    },
+    {
+      "id": "chain_002",
+      "category": "prerequisite_chain_discovery",
+      "question": "What do I need before CPTS 437 (ML)?",
+      "context": {
+        "target_course": "CPTS 437"
+      },
+      "expected_answer": "CPT S 437 requires CPT S 215, 223, or 233 with a C or better, plus admission to an EECS or Data Analytics major/minor. Chain from 121 -> 122 -> 223 -> 437.",
+      "reasoning_steps": [
+        "CPTS 437 prereq: CPTS 315 OR STAT 360",
+        "STAT 360 chain: MATH 171 -> MATH 172 -> STAT 360",
+        "CPTS 315 chain: 121 -> 122 -> 223 -> 315"
+      ]
+    },
+    {
+      "id": "chain_003",
+      "category": "prerequisite_chain_discovery",
+      "question": "Full prerequisite tree for CPTS 440?",
+      "context": {
+        "target_course": "CPTS 440"
+      },
+      "expected_answer": "CPT S 440 requires CPT S 223 or 233 with a C or better. Full chain: CPT S 121 -> CPT S 122 -> CPT S 223 -> CPT S 440.",
+      "reasoning_steps": [
+        "CPTS 440 prereq: CPTS 223",
+        "CPTS 223 prereq: CPTS 122",
+        "CPTS 122 prereq: CPTS 121"
+      ]
+    },
+    {
+      "id": "chain_004",
+      "category": "prerequisite_chain_discovery",
+      "question": "What is the full chain before CPTS 483 (capstone)?",
+      "context": {
+        "target_course": "CPTS 483"
+      },
+      "expected_answer": "CPT S 483 requires admission to an EECS or Data Analytics major/minor; prerequisite courses vary by topic. Typical foundation: CPT S 322, which requires 121 -> 122 -> 223 -> 322.",
+      "reasoning_steps": [
+        "CPTS 483 prereqs: CPTS 322, senior standing",
+        "CPTS 322 chain: 121 -> 122 -> 223 -> 322"
+      ]
+    },
+    {
+      "id": "chain_005",
+      "category": "prerequisite_chain_discovery",
+      "question": "Prereq chain for CPTS 451?",
+      "context": {
+        "target_course": "CPTS 451"
+      },
+      "expected_answer": "CPT S 451 requires CPT S 215, 223, or 233 with a C or better, plus EECS/Data Analytics admission. Chain: 121 -> 122 -> 223 -> 451.",
+      "reasoning_steps": [
+        "CPTS 451 prereq: CPTS 322 OR CPTS 355",
+        "Both branch from CPTS 223",
+        "CPTS 223 chain: 121 -> 122 -> 223"
+      ]
+    },
+    {
+      "id": "chain_006",
+      "category": "prerequisite_chain_discovery",
+      "question": "What do I need for CPTS 415 (Big Data)?",
+      "context": {
+        "target_course": "CPTS 415"
+      },
+      "expected_answer": "CPT S 415 requires CPT S 215, 223, or 233 with a C or better, plus major/minor admission. Chain: 121 -> 122 -> 223 -> 415.",
+      "reasoning_steps": [
+        "CPTS 415 prereq: CPTS 355 OR CPTS 451",
+        "Shortest path via CPTS 355"
+      ]
+    },
+    {
+      "id": "chain_007",
+      "category": "prerequisite_chain_discovery",
+      "question": "What prereqs do I need for CPTS 317?",
+      "context": {
+        "target_course": "CPTS 317"
+      },
+      "expected_answer": "CPT S 317 requires CPT S 122 or 132, and MATH 216. Chain: CPT S 121 -> CPT S 122 (+ MATH 216) -> CPT S 317.",
+      "reasoning_steps": [
+        "Direct: CPTS 223",
+        "CPTS 223 chain: 121 -> 122 -> 223"
+      ]
+    },
+    {
+      "id": "chain_008",
+      "category": "prerequisite_chain_discovery",
+      "question": "Full chain before CPTS 322 (Software Engineering)?",
+      "context": {
+        "target_course": "CPTS 322"
+      },
+      "expected_answer": "CPT S 322 requires CPT S 215, 223, or 233. Chain: CPT S 121 -> CPT S 122 -> CPT S 223 -> CPT S 322.",
+      "reasoning_steps": [
+        "CPTS 322 prereq: CPTS 223",
+        "Chain via 121 -> 122 -> 223"
+      ]
+    },
+    {
+      "id": "chain_009",
+      "category": "prerequisite_chain_discovery",
+      "question": "Chain for CPTS 323?",
+      "context": {
+        "target_course": "CPTS 323"
+      },
+      "expected_answer": "CPT S 323 requires CPT S 122 or 132. Chain: CPT S 121 -> CPT S 122 -> CPT S 323.",
+      "reasoning_steps": [
+        "CPTS 323 prereq: CPTS 322",
+        "CPTS 322 chain: 121 -> 122 -> 223 -> 322"
+      ]
+    },
+    {
+      "id": "chain_010",
+      "category": "prerequisite_chain_discovery",
+      "question": "What math do I need for STAT 443?",
+      "context": {
+        "target_course": "STAT 443"
+      },
+      "expected_answer": "STAT 443 requires MATH 172 or 182, plus MATH 220, 225, or 230. Shortest path: MATH 171 -> MATH 172 and MATH 171 -> MATH 220 (or 225 or 230).",
+      "reasoning_steps": [
+        "STAT 443 prereq: STAT 360",
+        "STAT 360 prereq: MATH 172",
+        "MATH 172 prereq: MATH 171"
+      ]
+    },
+    {
+      "id": "chain_011",
+      "category": "prerequisite_chain_discovery",
+      "question": "Full chain for MATH 273?",
+      "context": {
+        "target_course": "MATH 273"
+      },
+      "expected_answer": "MATH 273 requires MATH 172 or 182 with a C or better. Chain: MATH 171 -> MATH 172 -> MATH 273.",
+      "reasoning_steps": [
+        "MATH 273 prereq: MATH 172",
+        "MATH 172 prereq: MATH 171"
+      ]
+    },
+    {
+      "id": "chain_012",
+      "category": "prerequisite_chain_discovery",
+      "question": "What must precede CPTS 466 (Numerical Methods)?",
+      "context": {
+        "target_course": "CPTS 466"
+      },
+      "expected_answer": "CPT S 466 requires CPT S 360. Full chain: 121 -> 122 -> 223 -> 260 -> 360 -> 466.",
+      "reasoning_steps": [
+        "CPTS 466 prereqs: CPTS 122, MATH 220",
+        "CPTS 122 chain: 121 -> 122",
+        "MATH 220 chain: 171 -> 172 -> 220"
+      ]
+    },
+    {
+      "id": "chain_013",
+      "category": "prerequisite_chain_discovery",
+      "question": "Prereq chain for CPTS 489?",
+      "context": {
+        "target_course": "CPTS 489"
+      },
+      "expected_answer": "CPT S 489 requires CPT S 322 with a C or better. Chain: 121 -> 122 -> 223 -> 322 -> 489.",
+      "reasoning_steps": [
+        "CPTS 489 prereq: CPTS 322",
+        "CPTS 322 chain standard"
+      ]
+    },
+    {
+      "id": "chain_014",
+      "category": "prerequisite_chain_discovery",
+      "question": "Chain for CPTS 487?",
+      "context": {
+        "target_course": "CPTS 487"
+      },
+      "expected_answer": "CPT S 487 requires CPT S 321 and CPT S 322. Chain: 121 -> 122 -> 223 -> 321 (and -> 322) -> 487.",
+      "reasoning_steps": [
+        "CPTS 487 prereq: CPTS 322",
+        "CPTS 322 chain: 121 -> 122 -> 223 -> 322"
+      ]
+    },
+    {
+      "id": "chain_015",
+      "category": "prerequisite_chain_discovery",
+      "question": "What do I need to reach CPTS 415 via CPTS 451?",
+      "context": {
+        "target_course": "CPTS 415",
+        "path_via": "CPTS 451"
+      },
+      "expected_answer": "CPT S 415 requires CPT S 215, 223, or 233. CPT S 451 also requires CPT S 215, 223, or 233. Both flow from 121 -> 122 -> 223.",
+      "reasoning_steps": [
+        "CPTS 415 via 451",
+        "CPTS 451 via CPTS 322",
+        "CPTS 322 chain: 121 -> 122 -> 223 -> 322"
+      ]
+    },
+    {
+      "id": "chain_016",
+      "category": "prerequisite_chain_discovery",
+      "question": "Full chain for CPTS 260?",
+      "context": {
+        "target_course": "CPTS 260"
+      },
+      "expected_answer": "CPT S 260 requires CPT S 223 or 233 (concurrent OK). Chain: CPT S 121 -> CPT S 122 -> CPT S 223 -> CPT S 260.",
+      "reasoning_steps": [
+        "Direct prereqs: CPTS 121, MATH 171",
+        "Neither has further CS/math prereqs"
+      ]
+    },
+    {
+      "id": "chain_017",
+      "category": "prerequisite_chain_discovery",
+      "question": "What is needed before PHYSICS 206?",
+      "context": {
+        "target_course": "PHYSICS 206"
+      },
+      "expected_answer": "PHYSICS 206 requires PHYSICS 201 or 205 with a C or better.",
+      "reasoning_steps": [
+        "PHYSICS 206 prereqs: PHYSICS 205, MATH 172",
+        "PHYSICS 205 prereq: MATH 171",
+        "MATH 172 prereq: MATH 171"
+      ]
+    },
+    {
+      "id": "chain_018",
+      "category": "prerequisite_chain_discovery",
+      "question": "Chain for ENGL 402?",
+      "context": {
+        "target_course": "ENGL 402"
+      },
+      "expected_answer": "ENGL 402 requires ENGL 101 or 298 and junior standing (60+ credits).",
+      "reasoning_steps": [
+        "ENGL 402 prereq: ENGL 101 + junior standing"
+      ]
+    },
+    {
+      "id": "chain_019",
+      "category": "prerequisite_chain_discovery",
+      "question": "What is required before CPTS 321?",
+      "context": {
+        "target_course": "CPTS 321"
+      },
+      "expected_answer": "CPT S 321 requires CPT S 223 or 233. Chain: CPT S 121 -> CPT S 122 -> CPT S 223 -> CPT S 321.",
+      "reasoning_steps": [
+        "CPTS 321 prereq: CPTS 223",
+        "CPTS 223 chain: 121 -> 122 -> 223"
+      ]
+    },
+    {
+      "id": "chain_020",
+      "category": "prerequisite_chain_discovery",
+      "question": "What must a student finish before upper-division CPTS (any 400-level)?",
+      "context": {
+        "target_course": "CPTS 4xx"
+      },
+      "expected_answer": "Most 400-level CPT S courses require CPT S 223 and EECS/Data Analytics major admission. Foundation: CPT S 121 -> 122 -> 223.",
+      "reasoning_steps": [
+        "Core CS foundation is 121/122/223",
+        "Math foundation is 171/172",
+        "Upper-division branches from 322 or 355"
+      ]
+    },
+    {
+      "id": "chain_021",
+      "category": "prerequisite_chain_discovery",
+      "question": "Chain for CPTS 355?",
+      "context": {
+        "target_course": "CPTS 355"
+      },
+      "expected_answer": "CPT S 355 requires CPT S 223 or 233. Chain: CPT S 121 -> CPT S 122 -> CPT S 223 -> CPT S 355.",
+      "reasoning_steps": [
+        "CPTS 355 prereq: CPTS 223",
+        "CPTS 223 chain"
+      ]
+    },
+    {
+      "id": "chain_022",
+      "category": "prerequisite_chain_discovery",
+      "question": "What must come before MATH 216?",
+      "context": {
+        "target_course": "MATH 216"
+      },
+      "expected_answer": "MATH 216 requires MATH 106 or 201, or MATH 140, 171, 202, or DATA 121 with a C or better.",
+      "reasoning_steps": [
+        "MATH 216 prereq: MATH 172",
+        "MATH 172 prereq: MATH 171"
+      ]
+    },
+    {
+      "id": "chain_023",
+      "category": "prerequisite_chain_discovery",
+      "question": "Prereq chain for STAT 360?",
+      "context": {
+        "target_course": "STAT 360"
+      },
+      "expected_answer": "STAT 360 requires MATH 140, 171, 202, DATA 121, or MATH 172/182. Shortest chain: MATH 171 -> STAT 360.",
+      "reasoning_steps": [
+        "STAT 360 prereq: MATH 172",
+        "MATH 172 prereq: MATH 171"
+      ]
+    },
+    {
+      "id": "chain_024",
+      "category": "prerequisite_chain_discovery",
+      "question": "What is needed before PHYSICS 202?",
+      "context": {
+        "target_course": "PHYSICS 202"
+      },
+      "expected_answer": "PHYSICS 202 requires PHYSICS 201 or 205 with a C or better.",
+      "reasoning_steps": [
+        "PHYSICS 202 prereqs: PHYSICS 201, MATH 172",
+        "PHYSICS 201 prereq: MATH 171"
+      ]
+    },
+    {
+      "id": "chain_025",
+      "category": "prerequisite_chain_discovery",
+      "question": "What math must come before CPTS 466?",
+      "context": {
+        "target_course": "CPTS 466",
+        "subset": "math_only"
+      },
+      "expected_answer": "CPT S 466 requires CPT S 360, which requires CPT S 223 (needs MATH 216) and CPT S 260. No separate math prereq beyond MATH 216.",
+      "reasoning_steps": [
+        "CPTS 466 math prereq: MATH 220",
+        "MATH 220 chain: 171 -> 172 -> 220"
+      ]
+    },
+    {
+      "id": "credit_001",
+      "category": "credit_calculations",
+      "question": "How many credits remain for a CS BS if I have completed 30 credits?",
+      "context": {
+        "degree": "Computer Science",
+        "credits_earned": 30,
+        "total_required": 120
+      },
+      "expected_answer": "90 credits remain (120 - 30).",
+      "reasoning_steps": [
+        "CS BS requires 120 credits",
+        "30 earned -> 120 - 30 = 90 remaining"
+      ]
+    },
+    {
+      "id": "credit_002",
+      "category": "credit_calculations",
+      "question": "I have 85 credits. How many more to graduate with a CS degree?",
+      "context": {
+        "degree": "Computer Science",
+        "credits_earned": 85
+      },
+      "expected_answer": "35 credits remain (120 - 85).",
+      "reasoning_steps": [
+        "CS BS requires 120",
+        "120 - 85 = 35"
+      ]
+    },
+    {
+      "id": "credit_003",
+      "category": "credit_calculations",
+      "question": "Do I meet the 40-credit upper-division minimum with 25 UD credits?",
+      "context": {
+        "upper_division_credits": 25,
+        "requirement": 40
+      },
+      "expected_answer": "No. You need 15 more upper-division (300/400-level) credits.",
+      "reasoning_steps": [
+        "WSU UD requirement: 40 credits 300-level or above",
+        "25 earned -> 15 more needed"
+      ]
+    },
+    {
+      "id": "credit_004",
+      "category": "credit_calculations",
+      "question": "How many CPTS credits does a CS major typically need?",
+      "context": {
+        "degree": "Computer Science"
+      },
+      "expected_answer": "Approximately 45-48 CPTS credits across core and electives for the CS BS.",
+      "reasoning_steps": [
+        "Core CPTS: 121, 122, 223, 260, 317, 322, 355, 360, 483 (~28 cr)",
+        "Plus ~15-18 credits of CPTS electives"
+      ]
+    },
+    {
+      "id": "credit_005",
+      "category": "credit_calculations",
+      "question": "Each CPTS core course is 3 credits. After CPTS 121, 122, 223, 260 how many core credits have I earned?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 260"
+        ]
+      },
+      "expected_answer": "12 credits (4 courses x 3 credits).",
+      "reasoning_steps": [
+        "Each listed course = 3 cr",
+        "4 x 3 = 12"
+      ]
+    },
+    {
+      "id": "credit_006",
+      "category": "credit_calculations",
+      "question": "If I complete CPTS 121, 122, 223, 260, 317, 322, 355, 360 how many core CS credits have I earned?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 260",
+          "CPTS 317",
+          "CPTS 322",
+          "CPTS 355",
+          "CPTS 360"
+        ]
+      },
+      "expected_answer": "About 24 credits (8 x 3).",
+      "reasoning_steps": [
+        "8 core CPTS courses at 3 credits each",
+        "= 24 credits"
+      ]
+    },
+    {
+      "id": "credit_007",
+      "category": "credit_calculations",
+      "question": "MATH 171 is 4 credits, MATH 172 is 4, MATH 216 is 3. Total math credits after all three?",
+      "context": {
+        "completed_courses": [
+          "MATH 171",
+          "MATH 172",
+          "MATH 216"
+        ]
+      },
+      "expected_answer": "11 math credits (4 + 4 + 3).",
+      "reasoning_steps": [
+        "MATH 171: 4",
+        "MATH 172: 4",
+        "MATH 216: 3",
+        "Sum = 11"
+      ]
+    },
+    {
+      "id": "credit_008",
+      "category": "credit_calculations",
+      "question": "How many total credits in PHYSICS 201 + 202?",
+      "context": {
+        "completed_courses": [
+          "PHYSICS 201",
+          "PHYSICS 202"
+        ]
+      },
+      "expected_answer": "8 credits (4 each).",
+      "reasoning_steps": [
+        "PHYSICS 201: 4 cr",
+        "PHYSICS 202: 4 cr",
+        "Total 8"
+      ]
+    },
+    {
+      "id": "credit_009",
+      "category": "credit_calculations",
+      "question": "If I have 14 UCORE credits completed and UCORE requires about 34, how many remain?",
+      "context": {
+        "ucore_credits_earned": 14,
+        "ucore_required": 34
+      },
+      "expected_answer": "20 UCORE credits remain.",
+      "reasoning_steps": [
+        "UCORE requirement ~34 cr",
+        "34 - 14 = 20"
+      ]
+    },
+    {
+      "id": "credit_010",
+      "category": "credit_calculations",
+      "question": "I've taken 18 credits this semester and plan 15 next. What will my total be if I currently have 60?",
+      "context": {
+        "current_credits": 60,
+        "planned": [
+          18,
+          15
+        ]
+      },
+      "expected_answer": "93 credits total (60 + 18 + 15).",
+      "reasoning_steps": [
+        "60 + 18 = 78",
+        "78 + 15 = 93"
+      ]
+    },
+    {
+      "id": "credit_011",
+      "category": "credit_calculations",
+      "question": "How many credits am I missing if I have 105 completed toward a 120-credit degree?",
+      "context": {
+        "credits_earned": 105,
+        "required": 120
+      },
+      "expected_answer": "15 credits short.",
+      "reasoning_steps": [
+        "120 - 105 = 15"
+      ]
+    },
+    {
+      "id": "credit_012",
+      "category": "credit_calculations",
+      "question": "Am I at junior standing with 58 credits?",
+      "context": {
+        "credits_earned": 58
+      },
+      "expected_answer": "No. Junior standing at WSU requires 60+ credits.",
+      "reasoning_steps": [
+        "Junior: 60-89 cr",
+        "58 < 60 -> still sophomore"
+      ]
+    },
+    {
+      "id": "credit_013",
+      "category": "credit_calculations",
+      "question": "Am I a senior with 92 credits?",
+      "context": {
+        "credits_earned": 92
+      },
+      "expected_answer": "Yes. Senior standing begins at 90 credits.",
+      "reasoning_steps": [
+        "Senior: 90+",
+        "92 >= 90 -> senior"
+      ]
+    },
+    {
+      "id": "credit_014",
+      "category": "credit_calculations",
+      "question": "If 48 of my 72 credits are in CPTS and MATH, how many are non-major credits?",
+      "context": {
+        "total": 72,
+        "major": 48
+      },
+      "expected_answer": "24 non-major credits.",
+      "reasoning_steps": [
+        "72 - 48 = 24"
+      ]
+    },
+    {
+      "id": "credit_015",
+      "category": "credit_calculations",
+      "question": "How many credits to move from sophomore (45) to junior?",
+      "context": {
+        "credits_earned": 45
+      },
+      "expected_answer": "15 credits to reach 60 (junior threshold).",
+      "reasoning_steps": [
+        "60 - 45 = 15"
+      ]
+    },
+    {
+      "id": "credit_016",
+      "category": "credit_calculations",
+      "question": "I have 12 credits of CPTS electives. Do I meet the 15-credit elective requirement?",
+      "context": {
+        "cpts_electives_earned": 12,
+        "requirement": 15
+      },
+      "expected_answer": "No. You need 3 more CPTS elective credits.",
+      "reasoning_steps": [
+        "15 - 12 = 3"
+      ]
+    },
+    {
+      "id": "credit_017",
+      "category": "credit_calculations",
+      "question": "If my load is 15 credits per semester, how many semesters to reach 120 from 30?",
+      "context": {
+        "credits_earned": 30,
+        "per_semester": 15,
+        "goal": 120
+      },
+      "expected_answer": "6 semesters at 15 credits each (90 / 15).",
+      "reasoning_steps": [
+        "120 - 30 = 90",
+        "90 / 15 = 6"
+      ]
+    },
+    {
+      "id": "credit_018",
+      "category": "credit_calculations",
+      "question": "Do I satisfy the 120-credit minimum with 118 credits?",
+      "context": {
+        "credits_earned": 118
+      },
+      "expected_answer": "No. 2 credits short of the 120-credit minimum.",
+      "reasoning_steps": [
+        "120 - 118 = 2 short"
+      ]
+    },
+    {
+      "id": "credit_019",
+      "category": "credit_calculations",
+      "question": "My transcript shows 127 credits but only 35 are upper-division. Am I degree-eligible?",
+      "context": {
+        "credits_earned": 127,
+        "upper_division": 35
+      },
+      "expected_answer": "Not yet. You meet the 120-credit minimum but are 5 credits short of the 40 UD requirement.",
+      "reasoning_steps": [
+        "Total credits OK (127 >= 120)",
+        "UD 35 < 40 -> 5 UD cr needed"
+      ]
+    },
+    {
+      "id": "credit_020",
+      "category": "credit_calculations",
+      "question": "How many credits do WSU residency requirements cover?",
+      "context": {
+        "rule": "residency"
+      },
+      "expected_answer": "At least 30 of the last 60 credits must be earned at WSU to satisfy residency.",
+      "reasoning_steps": [
+        "WSU residency: 30/60 final credits in residence"
+      ]
+    },
+    {
+      "id": "schedule_001",
+      "category": "schedule_feasibility",
+      "question": "Can I take CPTS 322, CPTS 355, CPTS 360, CPTS 440, and ENGL 402 in one semester?",
+      "context": {
+        "proposed": [
+          "CPTS 322",
+          "CPTS 355",
+          "CPTS 360",
+          "CPTS 440",
+          "ENGL 402"
+        ]
+      },
+      "expected_answer": "Credit-wise feasible (~15 cr) but workload is heavy; four 400-level CPTS courses plus writing-intensive ENGL 402 is not recommended.",
+      "reasoning_steps": [
+        "15-16 total credits",
+        "4 upper-division CPTS simultaneously is unusual",
+        "Feasibility: credits ok, workload high"
+      ]
+    },
+    {
+      "id": "schedule_002",
+      "category": "schedule_feasibility",
+      "question": "Is CPTS 121 + CPTS 122 in the same semester allowed?",
+      "context": {
+        "proposed": [
+          "CPTS 121",
+          "CPTS 122"
+        ]
+      },
+      "expected_answer": "No. CPTS 122 requires CPTS 121 as a prerequisite, not concurrent.",
+      "reasoning_steps": [
+        "CPTS 122 prereq: CPTS 121 (prerequisite, not corequisite)",
+        "Cannot overlap"
+      ]
+    },
+    {
+      "id": "schedule_003",
+      "category": "schedule_feasibility",
+      "question": "Can I take PHYSICS 201 and MATH 171 at the same time?",
+      "context": {
+        "proposed": [
+          "PHYSICS 201",
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "Yes. PHYSICS 201 allows MATH 171 concurrent.",
+      "reasoning_steps": [
+        "PHYSICS 201 prereq/concurrent: MATH 171",
+        "Allowed simultaneously"
+      ]
+    },
+    {
+      "id": "schedule_004",
+      "category": "schedule_feasibility",
+      "question": "Can 18 credits fit in one semester including two labs?",
+      "context": {
+        "proposed_credits": 18,
+        "labs": 2
+      },
+      "expected_answer": "Technically yes, but 18 credits with two labs is a heavy load; advisor approval often required above 18.",
+      "reasoning_steps": [
+        "Default max per semester: 18",
+        "Lab-heavy schedules recommend caution"
+      ]
+    },
+    {
+      "id": "schedule_005",
+      "category": "schedule_feasibility",
+      "question": "Can I take CPTS 483 and CPTS 322 together?",
+      "context": {
+        "proposed": [
+          "CPTS 322",
+          "CPTS 483"
+        ]
+      },
+      "expected_answer": "No. CPTS 483 requires CPTS 322 as a prerequisite.",
+      "reasoning_steps": [
+        "CPTS 483 prereq: CPTS 322",
+        "Cannot overlap"
+      ]
+    },
+    {
+      "id": "schedule_006",
+      "category": "schedule_feasibility",
+      "question": "Is CPTS 260 + MATH 171 feasible in one term for a freshman?",
+      "context": {
+        "proposed": [
+          "CPTS 260",
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "No. CPTS 260 requires MATH 171 as a prereq, not concurrent.",
+      "reasoning_steps": [
+        "CPTS 260 prereq: MATH 171",
+        "Cannot take simultaneously"
+      ]
+    },
+    {
+      "id": "schedule_007",
+      "category": "schedule_feasibility",
+      "question": "Feasible: CPTS 223, CPTS 260, MATH 172, PHYSICS 201 together?",
+      "context": {
+        "proposed": [
+          "CPTS 223",
+          "CPTS 260",
+          "MATH 172",
+          "PHYSICS 201"
+        ]
+      },
+      "expected_answer": "Yes if prereqs (CPTS 122, MATH 171) are done. Total ~14 cr; challenging but feasible.",
+      "reasoning_steps": [
+        "Prereq status must include CPTS 122, MATH 171",
+        "No course conflicts between these",
+        "~14 credits"
+      ]
+    },
+    {
+      "id": "schedule_008",
+      "category": "schedule_feasibility",
+      "question": "Can I take MATH 172 and PHYSICS 202 together?",
+      "context": {
+        "proposed": [
+          "MATH 172",
+          "PHYSICS 202"
+        ]
+      },
+      "expected_answer": "Yes. PHYSICS 202 allows MATH 172 concurrent.",
+      "reasoning_steps": [
+        "PHYSICS 202 prereq/concurrent: MATH 172",
+        "Allowed"
+      ]
+    },
+    {
+      "id": "schedule_009",
+      "category": "schedule_feasibility",
+      "question": "Can a transfer student take CPTS 223 and CPTS 260 in the same semester?",
+      "context": {
+        "proposed": [
+          "CPTS 223",
+          "CPTS 260"
+        ],
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "Yes. Their prereqs do not overlap and are independent after CPTS 122 and MATH 171.",
+      "reasoning_steps": [
+        "CPTS 223 prereq: CPTS 122 -> met",
+        "CPTS 260 prereqs: CPTS 121, MATH 171 -> met",
+        "Both eligible concurrently"
+      ]
+    },
+    {
+      "id": "schedule_010",
+      "category": "schedule_feasibility",
+      "question": "Can I take CPTS 437 and CPTS 440 together?",
+      "context": {
+        "proposed": [
+          "CPTS 437",
+          "CPTS 440"
+        ],
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "STAT 360"
+        ]
+      },
+      "expected_answer": "Yes. Prereqs for both are met (STAT 360 satisfies CPTS 437; CPTS 223 satisfies CPTS 440).",
+      "reasoning_steps": [
+        "CPTS 437 prereq: STAT 360 -> met",
+        "CPTS 440 prereq: CPTS 223 -> met",
+        "Eligible concurrently"
+      ]
+    },
+    {
+      "id": "schedule_011",
+      "category": "schedule_feasibility",
+      "question": "Is a 21-credit schedule allowed?",
+      "context": {
+        "proposed_credits": 21
+      },
+      "expected_answer": "Only with advisor and dean approval; standard max is 18 credits per semester.",
+      "reasoning_steps": [
+        "Standard cap: 18",
+        "Overload requires approval"
+      ]
+    },
+    {
+      "id": "schedule_012",
+      "category": "schedule_feasibility",
+      "question": "Minimum full-time credit load per semester?",
+      "context": {
+        "rule": "full_time"
+      },
+      "expected_answer": "12 credits for full-time undergraduate status.",
+      "reasoning_steps": [
+        "WSU full-time: 12+ credits"
+      ]
+    },
+    {
+      "id": "schedule_013",
+      "category": "schedule_feasibility",
+      "question": "Can I take CPTS 451, CPTS 415, and CPTS 483 together?",
+      "context": {
+        "proposed": [
+          "CPTS 451",
+          "CPTS 415",
+          "CPTS 483"
+        ],
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 322",
+          "CPTS 355"
+        ]
+      },
+      "expected_answer": "Yes. All prereqs are met (CPTS 322 for 451/483, CPTS 355 for 415).",
+      "reasoning_steps": [
+        "CPTS 451 prereq: CPTS 322 or 355 -> met",
+        "CPTS 415 prereq: CPTS 355 or 451 -> met",
+        "CPTS 483 prereq: CPTS 322 -> met"
+      ]
+    },
+    {
+      "id": "schedule_014",
+      "category": "schedule_feasibility",
+      "question": "Is it feasible to take CPTS 317 + CPTS 322 + CPTS 355 in one semester?",
+      "context": {
+        "proposed": [
+          "CPTS 317",
+          "CPTS 322",
+          "CPTS 355"
+        ],
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223"
+        ]
+      },
+      "expected_answer": "Yes, all three require CPTS 223 which is complete. ~9 credits.",
+      "reasoning_steps": [
+        "Each prereq: CPTS 223 -> met",
+        "No conflicts"
+      ]
+    },
+    {
+      "id": "schedule_015",
+      "category": "schedule_feasibility",
+      "question": "Can a freshman fit CPTS 121, MATH 171, ENGL 101, and a UCORE in semester one?",
+      "context": {
+        "proposed": [
+          "CPTS 121",
+          "MATH 171",
+          "ENGL 101",
+          "HISTORY 105"
+        ]
+      },
+      "expected_answer": "Yes. ~14-15 credits, all freshman-accessible.",
+      "reasoning_steps": [
+        "No prereqs blocking",
+        "Balanced ~14-15 cr freshman term"
+      ]
+    },
+    {
+      "id": "ucore_001",
+      "category": "ucore_planning",
+      "question": "Which UCORE categories remain if I've completed WRTG, QUAN, and COMM?",
+      "context": {
+        "ucore_completed": [
+          "WRTG",
+          "QUAN",
+          "COMM"
+        ]
+      },
+      "expected_answer": "Remaining: BSCI, PSCI, SSCI, HUM, ARTS, DIVR, INTG/CAPS.",
+      "reasoning_steps": [
+        "UCORE set: WRTG, QUAN, COMM, BSCI, PSCI, SSCI, HUM, ARTS, DIVR, INTG/CAPS",
+        "Subtract completed"
+      ]
+    },
+    {
+      "id": "ucore_002",
+      "category": "ucore_planning",
+      "question": "What UCORE does HISTORY 105 satisfy?",
+      "context": {
+        "course": "HISTORY 105"
+      },
+      "expected_answer": "HISTORY 105 satisfies the HUM (Humanities) and often ROOT requirements.",
+      "reasoning_steps": [
+        "HISTORY 105 is a HUM ROOT course"
+      ]
+    },
+    {
+      "id": "ucore_003",
+      "category": "ucore_planning",
+      "question": "Which UCORE does ENGL 101 fulfill?",
+      "context": {
+        "course": "ENGL 101"
+      },
+      "expected_answer": "ENGL 101 fulfills the WRTG (Writing) first-year composition requirement.",
+      "reasoning_steps": [
+        "ENGL 101 = WRTG requirement"
+      ]
+    },
+    {
+      "id": "ucore_004",
+      "category": "ucore_planning",
+      "question": "Does MATH 171 satisfy the QUAN UCORE?",
+      "context": {
+        "course": "MATH 171"
+      },
+      "expected_answer": "Yes. MATH 171 satisfies the QUAN (Quantitative Reasoning) requirement.",
+      "reasoning_steps": [
+        "MATH 171 = QUAN"
+      ]
+    },
+    {
+      "id": "ucore_005",
+      "category": "ucore_planning",
+      "question": "What UCORE is satisfied by PHYSICS 201?",
+      "context": {
+        "course": "PHYSICS 201"
+      },
+      "expected_answer": "PHYSICS 201 satisfies the PSCI (Physical Sciences) lab-science requirement.",
+      "reasoning_steps": [
+        "PHYSICS 201 = PSCI"
+      ]
+    },
+    {
+      "id": "ucore_006",
+      "category": "ucore_planning",
+      "question": "What UCORE does COM 102 cover?",
+      "context": {
+        "course": "COM 102"
+      },
+      "expected_answer": "COM 102 satisfies the COMM (Communication) requirement.",
+      "reasoning_steps": [
+        "COM 102 = COMM"
+      ]
+    },
+    {
+      "id": "ucore_007",
+      "category": "ucore_planning",
+      "question": "Does CPTS 483 count as the INTG/CAPS UCORE for CS majors?",
+      "context": {
+        "course": "CPTS 483",
+        "major": "Computer Science"
+      },
+      "expected_answer": "Yes. CPTS 483 is the CS capstone and fulfills the major's INTG/CAPS requirement.",
+      "reasoning_steps": [
+        "CPTS 483 = CS capstone = CAPS"
+      ]
+    },
+    {
+      "id": "ucore_008",
+      "category": "ucore_planning",
+      "question": "I have COM 102 but no WRTG. What do I still need?",
+      "context": {
+        "ucore_completed": [
+          "COMM"
+        ]
+      },
+      "expected_answer": "You still need WRTG (typically ENGL 101) plus the remaining UCORE categories.",
+      "reasoning_steps": [
+        "WRTG missing",
+        "Typical WRTG: ENGL 101"
+      ]
+    },
+    {
+      "id": "ucore_009",
+      "category": "ucore_planning",
+      "question": "Which UCORE categories have a lab component?",
+      "context": {
+        "rule": "lab_science"
+      },
+      "expected_answer": "BSCI (Biological Sciences) and PSCI (Physical Sciences) require a lab course.",
+      "reasoning_steps": [
+        "UCORE lab: BSCI or PSCI with lab"
+      ]
+    },
+    {
+      "id": "ucore_010",
+      "category": "ucore_planning",
+      "question": "What's left after WRTG, QUAN, COMM, PSCI, BSCI, SSCI, and HUM are complete?",
+      "context": {
+        "ucore_completed": [
+          "WRTG",
+          "QUAN",
+          "COMM",
+          "PSCI",
+          "BSCI",
+          "SSCI",
+          "HUM"
+        ]
+      },
+      "expected_answer": "Remaining: ARTS, DIVR, INTG/CAPS.",
+      "reasoning_steps": [
+        "Subtract completed from full UCORE set"
+      ]
+    },
+    {
+      "id": "degree_001",
+      "category": "degree_progress",
+      "question": "What's left for my CS degree if I've completed CPTS 121, 122, 223, 260, MATH 171, 172, ENGL 101?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 260",
+          "MATH 171",
+          "MATH 172",
+          "ENGL 101"
+        ]
+      },
+      "expected_answer": "Remaining core: CPTS 317, 322, 355, 360, 483, MATH 216 (or 220), STAT 360, PHYSICS 201/202, most UCORE, and CPTS/technical electives.",
+      "reasoning_steps": [
+        "Subtract completed from CS BS required list",
+        "Identify remaining core + electives + UCORE"
+      ]
+    },
+    {
+      "id": "degree_002",
+      "category": "degree_progress",
+      "question": "Am I close to graduating with 110 credits and all core CPTS done?",
+      "context": {
+        "credits_earned": 110,
+        "core_cpts_done": true
+      },
+      "expected_answer": "Close - 10 credits short of 120. Verify UCORE, UD minimum, and capstone (CPTS 483) completion.",
+      "reasoning_steps": [
+        "120 - 110 = 10 short",
+        "Check UD, UCORE, capstone"
+      ]
+    },
+    {
+      "id": "degree_003",
+      "category": "degree_progress",
+      "question": "What do I still need after finishing everything except CPTS 483?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 260",
+          "CPTS 317",
+          "CPTS 322",
+          "CPTS 355",
+          "CPTS 360",
+          "MATH 171",
+          "MATH 172",
+          "MATH 216",
+          "STAT 360",
+          "ENGL 101",
+          "ENGL 402",
+          "PHYSICS 201",
+          "PHYSICS 202",
+          "HISTORY 105"
+        ]
+      },
+      "expected_answer": "Only CPTS 483 (capstone) plus any remaining UCORE (ARTS, DIVR) and sufficient CPTS electives.",
+      "reasoning_steps": [
+        "Capstone open",
+        "Verify UCORE ARTS, DIVR",
+        "Check elective count"
+      ]
+    },
+    {
+      "id": "degree_004",
+      "category": "degree_progress",
+      "question": "Progress summary: CPTS 121, 122 done, MATH 171 done. What's next?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "MATH 171"
+        ]
+      },
+      "expected_answer": "Next-term recommendations: CPTS 223, CPTS 260, MATH 172, ENGL 101, and one UCORE.",
+      "reasoning_steps": [
+        "Open now: CPTS 223 (122), CPTS 260 (121+171), MATH 172 (171)"
+      ]
+    },
+    {
+      "id": "degree_005",
+      "category": "degree_progress",
+      "question": "I'm a sophomore with 45 credits. What CS courses should I prioritize?",
+      "context": {
+        "credits_earned": 45,
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "MATH 171",
+          "MATH 172",
+          "ENGL 101"
+        ]
+      },
+      "expected_answer": "Prioritize CPTS 223, CPTS 260, MATH 216 (or 220) this year to unlock all upper-division CS.",
+      "reasoning_steps": [
+        "CPTS 223 unlocks 317, 322, 355, 440",
+        "CPTS 260 unlocks 360",
+        "MATH 216/220 unlocks STAT 360, CPTS 466"
+      ]
+    },
+    {
+      "id": "degree_006",
+      "category": "degree_progress",
+      "question": "Will finishing CPTS 322, CPTS 355, and CPTS 360 this term put me in graduation range?",
+      "context": {
+        "credits_earned": 95,
+        "planned": [
+          "CPTS 322",
+          "CPTS 355",
+          "CPTS 360"
+        ]
+      },
+      "expected_answer": "Yes. +9 credits puts you at 104; one more term of 15 credits reaches 119-120.",
+      "reasoning_steps": [
+        "95 + 9 = 104",
+        "Remaining = 16 -> one more term"
+      ]
+    },
+    {
+      "id": "degree_007",
+      "category": "degree_progress",
+      "question": "What's missing: all CPTS core + UCORE complete but only 112 credits total.",
+      "context": {
+        "credits_earned": 112,
+        "cpts_core": "complete",
+        "ucore": "complete"
+      },
+      "expected_answer": "8 elective credits needed to reach 120; check upper-division minimum too.",
+      "reasoning_steps": [
+        "120 - 112 = 8",
+        "Verify UD count"
+      ]
+    },
+    {
+      "id": "degree_008",
+      "category": "degree_progress",
+      "question": "Do I need STAT 360 for a CS BS?",
+      "context": {
+        "degree": "Computer Science"
+      },
+      "expected_answer": "Yes. STAT 360 is required (or equivalent) for the CS BS.",
+      "reasoning_steps": [
+        "CS BS requires statistics course",
+        "STAT 360 is the standard option"
+      ]
+    },
+    {
+      "id": "degree_009",
+      "category": "degree_progress",
+      "question": "Is PHYSICS required for CS at WSU?",
+      "context": {
+        "degree": "Computer Science"
+      },
+      "expected_answer": "Yes. CS BS requires PHYSICS 201/205 and 202/206 (or equivalent lab physics sequence).",
+      "reasoning_steps": [
+        "CS BS: two-semester calc-based physics with lab"
+      ]
+    },
+    {
+      "id": "degree_010",
+      "category": "degree_progress",
+      "question": "Degree audit: I'm missing 2 CPTS electives and 1 UCORE. How many credits roughly?",
+      "context": {
+        "missing": [
+          "2 CPTS electives",
+          "1 UCORE"
+        ]
+      },
+      "expected_answer": "Roughly 9 credits (2x3 electives + 3 UCORE).",
+      "reasoning_steps": [
+        "2 electives = 6 cr",
+        "1 UCORE = 3 cr"
+      ]
+    },
+    {
+      "id": "degree_011",
+      "category": "degree_progress",
+      "question": "Do I meet the CS BS GPA requirement with 2.4 major GPA?",
+      "context": {
+        "major_gpa": 2.4
+      },
+      "expected_answer": "No. CS BS requires a 2.5 GPA in the major and in all WSU work.",
+      "reasoning_steps": [
+        "CS BS major GPA min: 2.5",
+        "2.4 < 2.5"
+      ]
+    },
+    {
+      "id": "degree_012",
+      "category": "degree_progress",
+      "question": "What's required to declare CS major?",
+      "context": {
+        "rule": "major_declaration"
+      },
+      "expected_answer": "Completion of CPTS 121 and CPTS 122 with C or better and 2.5 GPA in these courses.",
+      "reasoning_steps": [
+        "CS major declaration: CPTS 121, 122 with 2.5 GPA"
+      ]
+    },
+    {
+      "id": "degree_013",
+      "category": "degree_progress",
+      "question": "After 60 credits and CPTS 223, what year am I typically in?",
+      "context": {
+        "credits_earned": 60,
+        "completed_courses": [
+          "CPTS 223"
+        ]
+      },
+      "expected_answer": "Junior standing with core CS foundation complete.",
+      "reasoning_steps": [
+        "60 cr = junior",
+        "CPTS 223 complete = foundation done"
+      ]
+    },
+    {
+      "id": "degree_014",
+      "category": "degree_progress",
+      "question": "Can I graduate in 4 years from 0 credits taking 15 cr per semester?",
+      "context": {
+        "per_semester": 15,
+        "goal": 120
+      },
+      "expected_answer": "Yes. 15 cr x 8 semesters = 120 credits over 4 years.",
+      "reasoning_steps": [
+        "15 * 8 = 120"
+      ]
+    },
+    {
+      "id": "degree_015",
+      "category": "degree_progress",
+      "question": "What's left if I only need ENGL 402 and CPTS 483?",
+      "context": {
+        "remaining": [
+          "ENGL 402",
+          "CPTS 483"
+        ]
+      },
+      "expected_answer": "~6 credits (3 each). Assuming all other requirements and the 120/40-UD thresholds are met.",
+      "reasoning_steps": [
+        "3 + 3 = 6"
+      ]
+    },
+    {
+      "id": "degree_016",
+      "category": "degree_progress",
+      "question": "I completed the CS core and MATH but no UCORE. Can I graduate?",
+      "context": {
+        "ucore_status": "none"
+      },
+      "expected_answer": "No. UCORE (~34 credits) is required for all WSU BS degrees.",
+      "reasoning_steps": [
+        "UCORE not optional",
+        "Must complete all categories"
+      ]
+    },
+    {
+      "id": "degree_017",
+      "category": "degree_progress",
+      "question": "If I have CPTS 121, 122, 223, 260 done in year 1, am I on a 4-year track?",
+      "context": {
+        "year": 1,
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 260"
+        ]
+      },
+      "expected_answer": "Yes - ahead of the typical plan (these are usually spread across years 1-2).",
+      "reasoning_steps": [
+        "4 core courses in year 1 = accelerated",
+        "On track or ahead"
+      ]
+    },
+    {
+      "id": "degree_018",
+      "category": "degree_progress",
+      "question": "Do I need a minor for CS BS at WSU?",
+      "context": {
+        "rule": "minor_required"
+      },
+      "expected_answer": "No. CS BS does not require a minor; it is optional.",
+      "reasoning_steps": [
+        "Minor not required for CS BS"
+      ]
+    },
+    {
+      "id": "degree_019",
+      "category": "degree_progress",
+      "question": "Senior check: 88 credits, all core CPTS done, all UCORE done. What's left?",
+      "context": {
+        "credits_earned": 88,
+        "cpts_core": "complete",
+        "ucore": "complete"
+      },
+      "expected_answer": "~32 credits - mostly electives and possibly CPTS 483 if still pending. Confirm UD count.",
+      "reasoning_steps": [
+        "120 - 88 = 32",
+        "Mostly electives remain"
+      ]
+    },
+    {
+      "id": "degree_020",
+      "category": "degree_progress",
+      "question": "Final semester audit: 117 credits, CPTS 483 pending. What's next?",
+      "context": {
+        "credits_earned": 117,
+        "pending": [
+          "CPTS 483"
+        ]
+      },
+      "expected_answer": "Complete CPTS 483 (3 cr) and one more elective to reach 120. Apply for graduation.",
+      "reasoning_steps": [
+        "120 - 117 = 3 + capstone",
+        "Graduation application required"
+      ]
+    }
+  ]
+}

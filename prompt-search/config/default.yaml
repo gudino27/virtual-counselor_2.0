@@ -1,0 +1,11 @@
+llm:
+  temperature: 0.7
+  max_tokens: 500
+
+cache:
+  enabled: true
+  db_path: "./data/cache/responses.db"
+  max_age_hours: 168
+
+rate_limiter:
+  requests_per_minute: 60

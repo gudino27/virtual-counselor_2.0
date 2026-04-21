@@ -1,0 +1,249 @@
+{
+  "metadata": {
+    "purpose": "Reference examples of prerequisite lookups and chain discovery for the WSU CS BS. Intended for use by the prerequisite checker module and for prompt-grounded retrieval.",
+    "institution": "Washington State University",
+    "count": 30
+  },
+  "examples": [
+    {
+      "course": "CPTS 121",
+      "title": "Program Design and Development I",
+      "credits": 4,
+      "prerequisites": [],
+      "recommended": ["MATH 105 or MATH 106 placement"],
+      "notes": "Entry course; no hard CS prerequisite."
+    },
+    {
+      "course": "CPTS 122",
+      "title": "Data Structures",
+      "credits": 4,
+      "prerequisites": ["CPTS 121 (C or better)"],
+      "recommended": [],
+      "notes": "C or better required to advance in the CS core."
+    },
+    {
+      "course": "CPTS 223",
+      "title": "Advanced Data Structures",
+      "credits": 3,
+      "prerequisites": ["CPTS 122 (C or better)"],
+      "recommended": [],
+      "notes": "Branching point for most upper-division CS courses."
+    },
+    {
+      "course": "CPTS 260",
+      "title": "Introduction to Computer Architecture",
+      "credits": 3,
+      "prerequisites": ["CPTS 121", "MATH 171"],
+      "recommended": [],
+      "notes": "Enables CPTS 360."
+    },
+    {
+      "course": "CPTS 317",
+      "title": "Automata and Formal Languages",
+      "credits": 3,
+      "prerequisites": ["CPTS 223"],
+      "recommended": ["MATH 216"],
+      "notes": "Theory-of-computation foundation."
+    },
+    {
+      "course": "CPTS 321",
+      "title": "Object-Oriented Software Design",
+      "credits": 3,
+      "prerequisites": ["CPTS 223"],
+      "recommended": [],
+      "notes": "Often paired with CPTS 322."
+    },
+    {
+      "course": "CPTS 322",
+      "title": "Software Engineering Principles I",
+      "credits": 3,
+      "prerequisites": ["CPTS 223"],
+      "recommended": [],
+      "notes": "Gateway for 400-level project and application courses."
+    },
+    {
+      "course": "CPTS 323",
+      "title": "Software Engineering Principles II",
+      "credits": 3,
+      "prerequisites": ["CPTS 322"],
+      "recommended": [],
+      "notes": "Follow-on to 322."
+    },
+    {
+      "course": "CPTS 355",
+      "title": "Programming Language Design",
+      "credits": 3,
+      "prerequisites": ["CPTS 223"],
+      "recommended": [],
+      "notes": "Alternate path into CPTS 451/415."
+    },
+    {
+      "course": "CPTS 360",
+      "title": "Systems Programming",
+      "credits": 3,
+      "prerequisites": ["CPTS 223", "CPTS 260"],
+      "recommended": [],
+      "notes": "Systems-level programming; both prereqs are strict."
+    },
+    {
+      "course": "CPTS 415",
+      "title": "Big Data",
+      "credits": 3,
+      "prerequisites": ["CPTS 355 OR CPTS 451"],
+      "recommended": ["STAT 360"],
+      "notes": "Disjunctive prerequisite."
+    },
+    {
+      "course": "CPTS 437",
+      "title": "Introduction to Machine Learning",
+      "credits": 3,
+      "prerequisites": ["CPTS 315 OR STAT 360"],
+      "recommended": ["MATH 220"],
+      "notes": "Most CS majors satisfy via STAT 360."
+    },
+    {
+      "course": "CPTS 440",
+      "title": "Artificial Intelligence",
+      "credits": 3,
+      "prerequisites": ["CPTS 223"],
+      "recommended": ["MATH 216"],
+      "notes": "Entry AI course."
+    },
+    {
+      "course": "CPTS 451",
+      "title": "Introduction to Database Systems",
+      "credits": 3,
+      "prerequisites": ["CPTS 322 OR CPTS 355"],
+      "recommended": [],
+      "notes": "Disjunctive prerequisite."
+    },
+    {
+      "course": "CPTS 466",
+      "title": "Numerical Methods",
+      "credits": 3,
+      "prerequisites": ["CPTS 122", "MATH 220"],
+      "recommended": [],
+      "notes": "Linear algebra required."
+    },
+    {
+      "course": "CPTS 483",
+      "title": "Senior Design Project",
+      "credits": 3,
+      "prerequisites": ["CPTS 322", "senior standing (90+ cr)"],
+      "recommended": [],
+      "notes": "Capstone; fulfills CS major INTG/CAPS UCORE."
+    },
+    {
+      "course": "CPTS 487",
+      "title": "Software Design Project",
+      "credits": 3,
+      "prerequisites": ["CPTS 322"],
+      "recommended": [],
+      "notes": "Advanced SE elective."
+    },
+    {
+      "course": "CPTS 489",
+      "title": "Web Services",
+      "credits": 3,
+      "prerequisites": ["CPTS 322"],
+      "recommended": ["CPTS 360"],
+      "notes": ""
+    },
+    {
+      "course": "MATH 171",
+      "title": "Calculus I",
+      "credits": 4,
+      "prerequisites": [],
+      "recommended": ["MATH 108 or placement"],
+      "notes": "Open entry with placement."
+    },
+    {
+      "course": "MATH 172",
+      "title": "Calculus II",
+      "credits": 4,
+      "prerequisites": ["MATH 171"],
+      "recommended": [],
+      "notes": ""
+    },
+    {
+      "course": "MATH 216",
+      "title": "Discrete Structures",
+      "credits": 3,
+      "prerequisites": ["MATH 172"],
+      "recommended": [],
+      "notes": "Alternative: MATH 220 satisfies math elective."
+    },
+    {
+      "course": "MATH 220",
+      "title": "Introductory Linear Algebra",
+      "credits": 2,
+      "prerequisites": ["MATH 172"],
+      "recommended": [],
+      "notes": ""
+    },
+    {
+      "course": "MATH 273",
+      "title": "Calculus III",
+      "credits": 2,
+      "prerequisites": ["MATH 172"],
+      "recommended": [],
+      "notes": ""
+    },
+    {
+      "course": "STAT 360",
+      "title": "Probability and Statistics",
+      "credits": 3,
+      "prerequisites": ["MATH 172"],
+      "recommended": [],
+      "notes": "Preferred path for CPTS 437."
+    },
+    {
+      "course": "STAT 443",
+      "title": "Applied Probability",
+      "credits": 3,
+      "prerequisites": ["STAT 360"],
+      "recommended": [],
+      "notes": ""
+    },
+    {
+      "course": "PHYSICS 201",
+      "title": "Physics for Scientists I",
+      "credits": 4,
+      "prerequisites": ["MATH 171 (concurrent allowed)"],
+      "recommended": [],
+      "notes": "Lab-included physics."
+    },
+    {
+      "course": "PHYSICS 202",
+      "title": "Physics for Scientists II",
+      "credits": 4,
+      "prerequisites": ["PHYSICS 201", "MATH 172 (concurrent allowed)"],
+      "recommended": [],
+      "notes": ""
+    },
+    {
+      "course": "ENGL 101",
+      "title": "Introductory Writing",
+      "credits": 3,
+      "prerequisites": [],
+      "recommended": [],
+      "notes": "Satisfies WRTG UCORE."
+    },
+    {
+      "course": "ENGL 402",
+      "title": "Technical and Professional Writing",
+      "credits": 3,
+      "prerequisites": ["ENGL 101", "junior standing"],
+      "recommended": [],
+      "notes": "Writing-in-major for CS."
+    },
+    {
+      "course": "COM 102",
+      "title": "Public Speaking",
+      "credits": 3,
+      "prerequisites": [],
+      "recommended": [],
+      "notes": "Satisfies COMM UCORE."
+    }
+  ]
+}

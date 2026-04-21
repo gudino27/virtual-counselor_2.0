@@ -1,0 +1,46 @@
+{
+  "sweep": [
+    {
+      "fetch_k": 12,
+      "max_context_words": 1024,
+      "accuracy": 0.875,
+      "elapsed_s": 69.5
+    },
+    {
+      "fetch_k": 12,
+      "max_context_words": null,
+      "accuracy": 0.9,
+      "elapsed_s": 73.5
+    },
+    {
+      "fetch_k": 20,
+      "max_context_words": 1024,
+      "accuracy": 0.85,
+      "elapsed_s": 68.0
+    },
+    {
+      "fetch_k": 20,
+      "max_context_words": null,
+      "accuracy": 0.875,
+      "elapsed_s": 67.8
+    },
+    {
+      "fetch_k": 30,
+      "max_context_words": 1024,
+      "accuracy": 0.9,
+      "elapsed_s": 71.0
+    },
+    {
+      "fetch_k": 30,
+      "max_context_words": null,
+      "accuracy": 0.925,
+      "elapsed_s": 75.9
+    }
+  ],
+  "best": {
+    "fetch_k": 30,
+    "max_context_words": null,
+    "accuracy": 0.925,
+    "elapsed_s": 75.9
+  }
+}

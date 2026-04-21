@@ -1,0 +1,11 @@
+llm:
+  provider: openai
+  model: gpt-4o-mini
+  api_key: "${OPENAI_API_KEY}"
+  org_id: "${OPENAI_ORG_ID}"
+  temperature: 0.7
+  max_tokens: 500
+
+rate_limiter:
+  requests_per_minute: 500
+  tokens_per_minute: 200000

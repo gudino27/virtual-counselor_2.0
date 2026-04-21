@@ -1,0 +1,115 @@
+{
+  "timestamp": "2026-04-14T22:58:04",
+  "dry_run": false,
+  "total_cases": 2,
+  "errors": 0,
+  "by_category": {
+    "prerequisite_validation": 1,
+    "degree_progress": 1
+  },
+  "elapsed_seconds": 7.87,
+  "filters": {
+    "category": null,
+    "ids": "prereq_001,degree_001",
+    "limit": null
+  },
+  "results": [
+    {
+      "id": "prereq_001",
+      "category": "prerequisite_validation",
+      "question": "Can I take CPTS 122 if I have completed CPTS 121?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121"
+        ]
+      },
+      "expected_answer": "Yes. CPTS 122 requires CPTS 121 with a C or better, which you have satisfied.",
+      "reasoning_steps": [
+        "Look up prerequisites for CPTS 122",
+        "Confirmed prereq: CPTS 121",
+        "CPTS 121 is in completed_courses",
+        "All prereqs met -> eligible"
+      ],
+      "actual_answer": "# Academic Advising - Course Enrollment Check\n\nLet me review your enrollment request step-by-step:\n\n## CPTS 122 (Data Structures C/C++)\n**Status: \u2713 YOU CAN ENROLL**\n\n- **Prerequisite required:** CPTS 121 with a C or better\n- **Your status:** You have completed CPTS 121\n- **Result:** You meet all requirements for this course\n\n## CPTS 121 (Program Design and Development C/C++)\n**Status: \u2717 YOU CANNOT ENROLL**\n\n- **Prerequisites required:** One of the following:\n  - MATH 108, 171, 172, 182, 201, 202, 206, or 220 (with C or better), OR\n  - CPTS 111 (with B+ or better), OR\n  - ALEKS math placement score of 78%, OR\n  - AP Exam credit (Comp Sci Principles or A with score of 4+)\n\n- **Your status:** You are missing these prerequisites\n- **Result:** You do not currently qualify for this course\n\n## Recommendation\n\n**You can enroll in CPTS 122 only.** Since you've already completed CPTS 121, you shouldn't need to retake it. If you need to take CPTS 121 for any reason, you'll need to first satisfy one of the math/placement prerequisites listed above.",
+      "routed_mode": "can_take",
+      "courses": [
+        "CPTS 122",
+        "CPTS 121"
+      ],
+      "checks": [
+        {
+          "code": "CPTS 122",
+          "found": true,
+          "can_take": true,
+          "prereqs": [
+            "CPT S 121"
+          ],
+          "missing": [],
+          "completed": [
+            "CPT S 121"
+          ]
+        },
+        {
+          "code": "CPTS 121",
+          "found": true,
+          "can_take": false,
+          "prereqs": [
+            "MATH 108",
+            "OR 220",
+            "CPT S 111"
+          ],
+          "missing": [
+            "MATH 108",
+            "OR 220",
+            "CPT S 111"
+          ],
+          "completed": []
+        }
+      ]
+    },
+    {
+      "id": "degree_001",
+      "category": "degree_progress",
+      "question": "What's left for my CS degree if I've completed CPTS 121, 122, 223, 260, MATH 171, 172, ENGL 101?",
+      "context": {
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
+          "CPTS 260",
+          "MATH 171",
+          "MATH 172",
+          "ENGL 101"
+        ]
+      },
+      "expected_answer": "Remaining core: CPTS 317, 322, 355, 360, 483, MATH 216 (or 220), STAT 360, PHYSICS 201/202, most UCORE, and CPTS/technical electives.",
+      "reasoning_steps": [
+        "Subtract completed from CS BS required list",
+        "Identify remaining core + electives + UCORE"
+      ],
+      "actual_answer": "# Computer Science Degree Progress Review\n\nThank you for meeting with me! Let me break down your progress and what you still need.\n\n## Current Status\nYou've completed **7 courses** toward your 120-credit degree:\n- \u2713 CPTS 121, CPTS 122, CPTS 223, CPTS 260\n- \u2713 MATH 171, MATH 172\n- \u2713 ENGL 101\n\n## Important Note on Course Codes\nI notice your transcript shows **CPTS** (Computer Science) while the degree catalog uses **CS**. These are equivalent\u2014CPTS is WSU Vancouver's prefix for computer science courses.\n\n## What You Still Need\n\n### Immediate Priority (Foundation Requirements)\nTo maintain good standing in the major, you must complete these with a **C or better**:\n- \u2713 MATH 171 \u2014 **COMPLETED**\n- \u2713 CPTS 121 \u2014 **COMPLETED**\n- **CPTS 122** \u2014 appears completed \u2713\n- **CPTS 166** \u2014 *Still needed*\n- **PHYSICS 201/211** \u2014 *Still needed*\n\n### Remaining General Education & Major Courses\n- HISTORY 105 [ROOT]\n- UCORE Inquiry courses (4 of 5 designations: ARTS, DIVR, EQJS, HUM, SSCI)\n- **15 credits** of CS Option Courses (300-400 level)\n- **3 credits** of CS Security Option Courses (CS 425, 426, or 427)\n- Science elective with lab (PHYSICS 202/212, CHEM 105/106, BIOLOGY 106/107)\n- ENGLISH 402 [WRTG]\n- STAT 360\n- Upper-level CS courses (CS 220/224, 260, 261, 317, 320, 351, 355, 360, 402, 420, 421, 450, 460)\n\n**Would you like me to help you plan your next term's schedule?**",
+      "routed_mode": "graduation_check",
+      "progress": {
+        "degree_program": "Computer Science",
+        "total_credits": 120,
+        "required_courses": [
+          "CS 121",
+          "HISTORY 105",
+          "MATH 171",
+          "PASS CS 121",
+          "TAKE MATH 171"
+        ],
+        "completed_matches": [
+          "MATH 171"
+        ],
+        "remaining": [
+          "CS 121",
+          "HISTORY 105",
+          "PASS CS 121",
+          "TAKE MATH 171"
+        ]
+      },
+      "degree": "Computer Science"
+    }
+  ]
+}

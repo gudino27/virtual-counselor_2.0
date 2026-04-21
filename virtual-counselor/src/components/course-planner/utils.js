@@ -30,7 +30,14 @@ export function getContrastingTextColor(cssColor) {
 
 export function stripHtml(input) {
   if (!input || typeof input !== 'string') return input;
-  return input.replace(/<[^>]+>/g, '').trim();
+  // Remove tags iteratively to handle nested/malformed markup
+  let prev;
+  let result = input;
+  do {
+    prev = result;
+    result = result.replace(/<[^>]*>/g, '');
+  } while (result !== prev);
+  return result.trim();
 }
 
 // Parse instructor data that may be a JSON array string, an array of objects,
