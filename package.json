@@ -17,20 +17,21 @@
   "author": "Virtual Counselor Team",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.54.0",
     "@domattheshack/rate-my-professors": "^2.2.1",
-    "axios": "^1.15.1",
+    "axios": "^1.15.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
     "helmet": "^8.1.0",
+    "iconv-lite": "^0.7.2",
+    "multer": "^2.1.1",
+    "pdf-parse": "^1.1.1",
     "sqlite3": "^5.1.7",
     "winston": "^3.19.0",
-    "zod": "^3.22.4"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
+    "zod": "^3.25.76"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -20,6 +20,11 @@ pids
 *.seed
 *.pid.lock
 
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Coverage directory used by tools like istanbul
 coverage/
 

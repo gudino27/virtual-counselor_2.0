@@ -15,14 +15,16 @@ import {
   loadDegreePlan,
   clearAllData,
 } from "../utils/storage";
-import { 
-  calculateGPA, 
-  calculateCreditsAchieved, 
-  calculateCreditsPlanned, 
+import {
+  calculateGPA,
+  calculateCreditsAchieved,
+  calculateCreditsPlanned,
   calculateCreditsRequired,
   getCompletedCourses,
   getDuplicateCourses,
-  analyzeDegreeProgress
+  analyzeDegreeProgress,
+  PASSING_GRADES,
+  getMinGradeForDegree,
 } from "../utils/degreeCalculations";
 import { optimizeSchedule } from "../utils/degreeOptimizer";
 import YearSection from "./degree-planner/YearSection";
@@ -262,10 +264,22 @@ function DegreePlanner() {
       return courses;
   }, [degreePlan]);
 
+  const degreeMinGrade = React.useMemo(() => {
+    const majorNames = (selectedPrograms.majors || []).map(m => m.name || '');
+    if (majorNames.length === 0) return null;
+    // Use the strictest (highest) minimum grade across all selected majors
+    const GRADE_RANK = { "C-": 0, "C": 1, "C+": 2, "B-": 3, "B": 4, "B+": 5, "A-": 6, "A": 7 };
+    let strictest = "C-";
+    majorNames.forEach(n => {
+      const g = getMinGradeForDegree(n);
+      if ((GRADE_RANK[g] ?? 0) > (GRADE_RANK[strictest] ?? 0)) strictest = g;
+    });
+    return strictest;
+  }, [selectedPrograms]);
+
   const progressAnalysis = React.useMemo(() => {
-      // Use the generic analyzer which handles duplicates/consumption
-      return analyzeDegreeProgress(flatUserCourses, allRequiredCourses, refinements);
-  }, [flatUserCourses, allRequiredCourses, refinements]);
+      return analyzeDegreeProgress(flatUserCourses, allRequiredCourses, refinements, degreeMinGrade);
+  }, [flatUserCourses, allRequiredCourses, refinements, degreeMinGrade]);
 
 
   const gpa = calculateGPA(degreePlan);
@@ -286,24 +300,13 @@ function DegreePlanner() {
   // If I take CPT S 121 twice, `calculateCreditsAchieved` counts it twice. `analyzeDegreeProgress` counts it once (if requirements only need it once).
   // The user wants the PLANNER (progress bar) to account for duplicates properly.
   
-  // New Credits Achieved based on Analysis (only count MATCHED courses that are COMPLETED)
-  const creditsAchievedSmart = progressAnalysis.matched.reduce((sum, m) => {
-      // Check if the matched user course is actually completed (has grade and is taken)
-      const isCompleted = m.matchedCourse && m.matchedCourse.status === "taken" && m.matchedCourse.grade &&
-                     ["A", "A-", "B+", "B", "B-", "C+", "C", "P"].includes(m.matchedCourse.grade);
-      return sum + (isCompleted ? (m.matchedCourse.credits || m.credits || 0) : 0);
-  }, 0);
-
-  // New Credits Planned (Smart) - count all matched (planned or taken)
-  const creditsPlannedSmart = progressAnalysis.matched.reduce((sum, m) => sum + (m.credits || 0), 0);
-  
-  // New Credits Required = analysis total
-  const creditsRequiredSmart = progressAnalysis.totalRequiredCredits || 120; // Fallback?
-
-  // Override the naive variables
-  const creditsAchieved = creditsAchievedSmart; 
-  const creditsPlanned = creditsPlannedSmart;
-  const creditsRequired = creditsRequiredSmart;
+  // Credits Achieved = raw total of passed courses in the plan (always, regardless of degree matching)
+  const creditsAchieved = calculateCreditsAchieved(degreePlan);
+  // Credits Planned = raw total of all courses with credits in the plan
+  const creditsPlanned = calculateCreditsPlanned(degreePlan);
+  // Credits Required = from degree requirements (or 0 if no program selected)
+  const noProgramSelected = allRequiredCourses.length === 0;
+  const creditsRequired = progressAnalysis.totalRequiredCredits || 0;
 
   // Compute list of completed course codes for prerequisite checking
   const allCompletedCourses = React.useMemo(() => {
@@ -314,6 +317,79 @@ function DegreePlanner() {
   const duplicateCourses = React.useMemo(() => {
     return getDuplicateCourses(degreePlan);
   }, [degreePlan]);
+
+  // Graduation projection: figure out current semester + how many more are needed
+  const graduationProjection = React.useMemo(() => {
+    if (creditsRequired === 0) return null;
+    const creditsRemaining = Math.max(creditsRequired - creditsAchieved, 0);
+    if (creditsRemaining === 0) return { semestersLeft: 0, yearsLeft: 0, extraYearsNeeded: 0 };
+
+    // Find the latest term with a "taken" course to determine current position
+    const TERM_ORDER = { fall: 0, spring: 1, summer: 2 };
+    let latestYearId = 0;
+    let latestTerm = 'fall';
+    Object.entries(degreePlan).forEach(([yId, yr]) => {
+      ['fall', 'spring', 'summer'].forEach(t => {
+        const hasTaken = (yr[t]?.courses || []).some(c => c.status === 'taken');
+        if (hasTaken) {
+          const y = parseInt(yId, 10);
+          if (y > latestYearId || (y === latestYearId && TERM_ORDER[t] > TERM_ORDER[latestTerm])) {
+            latestYearId = y;
+            latestTerm = t;
+          }
+        }
+      });
+    });
+
+    // Average credits/semester based on taken courses (fall+spring only, ignore summer)
+    let totalTakenCredits = 0;
+    let semestersTaken = 0;
+    Object.values(degreePlan).forEach(yr => {
+      ['fall', 'spring'].forEach(t => {
+        const sem = yr[t]?.courses || [];
+        const semCredits = sem.filter(c => c.status === 'taken').reduce((s, c) => s + (c.credits || 0), 0);
+        if (semCredits > 0) { totalTakenCredits += semCredits; semestersTaken++; }
+      });
+    });
+    const avgPerSemester = semestersTaken > 0 ? Math.round(totalTakenCredits / semestersTaken) : 15;
+    const avgEffective = Math.max(avgPerSemester, 9); // floor at 9 to avoid infinity
+
+    const semestersLeft = Math.ceil(creditsRemaining / avgEffective);
+    const yearsLeft = Math.ceil(semestersLeft / 2);
+
+    // How many more year tabs are needed beyond current plan?
+    const maxExistingYear = years.length > 0 ? Math.max(...years.map(y => y.id)) : 4;
+    const lastActiveYear = latestYearId || maxExistingYear;
+    const totalYearsNeeded = lastActiveYear + yearsLeft;
+    const extraYearsNeeded = Math.max(totalYearsNeeded - maxExistingYear, 0);
+
+    return { semestersLeft, yearsLeft, extraYearsNeeded, avgPerSemester: avgEffective, latestYearId, latestTerm };
+  }, [creditsRequired, creditsAchieved, degreePlan, years]);
+
+  // Auto-extend plan when extra years are needed
+  React.useEffect(() => {
+    if (!graduationProjection || graduationProjection.extraYearsNeeded <= 0) return;
+    setYears(prev => {
+      const maxId = prev.length > 0 ? Math.max(...prev.map(y => y.id)) : 4;
+      const toAdd = [];
+      for (let i = 1; i <= graduationProjection.extraYearsNeeded; i++) {
+        const newId = maxId + i;
+        toAdd.push({ id: newId, name: `Year ${newId}` });
+      }
+      return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+    });
+    setDegreePlan(prev => {
+      const next = { ...prev };
+      const maxId = years.length > 0 ? Math.max(...years.map(y => y.id)) : 4;
+      for (let i = 1; i <= graduationProjection.extraYearsNeeded; i++) {
+        const newId = maxId + i;
+        if (!next[newId]) {
+          next[newId] = { fall: { courses: [] }, spring: { courses: [] }, summer: { courses: [] } };
+        }
+      }
+      return next;
+    });
+  }, [graduationProjection?.extraYearsNeeded]);
 
   // Progress state: when no programs selected or creditsRequired === 0, show Not Started.
   let progress = "Not Started";
@@ -477,11 +553,11 @@ function DegreePlanner() {
     try {
       // Convert plural state key to singular for API call
       const apiTypeMap = {
-        majors: "major",
+        majors: "degree",
         minors: "minor",
         certificates: "certificate",
       };
-      const apiType = apiTypeMap[type] || type;
+      const apiType = apiTypeMap[type] || "degree";
       const data = await fetchDegreeRequirements(name, null, apiType);
       console.log("fetchDegreeRequirements result for", name, data);
 
@@ -537,50 +613,151 @@ function DegreePlanner() {
             }
           });
 
-          // Now populate
-          data.schedule.forEach((semester) => {
-            const yearId = parseInt(semester.year, 10);
-            const term = termMap[parseInt(semester.term, 10)];
-            if (!base[yearId]) {
-              base[yearId] = {
-                fall: { courses: [] },
-                spring: { courses: [] },
-                summer: { courses: [] },
-              };
-            }
-
-            if (base[yearId] && base[yearId][term]) {
-              semester.courses.forEach((course) => {
-                if (course.isNonCredit) return;
-                base[yearId][term].courses.push({
-                  id: Date.now() + Math.random(),
-                  name: course.raw || course.label || "",
-                  credits: course.credits || 0,
-                  grade: "",
-                  status: "planned",
-                  footnotes: course.footnotes || [],
-                  prefix: course.prefix,
-                  number: course.number,
-                  attributes: course.attributes || [],
-                  prerequisites:
-                    course.prerequisiteCodes || course.prerequisites || [],
-                });
+          // Build a set of course codes already in the plan to avoid duplicates
+          const existingCodes = new Set();
+          Object.values(base).forEach((yr) => {
+            ["fall", "spring", "summer"].forEach((t) => {
+              (yr[t]?.courses || []).forEach((c) => {
+                if (c.name) {
+                  const m = c.name.match(/^([A-Z\s&/]{2,15})\s*(\d{3})/i);
+                  if (m) existingCodes.add(`${m[1].trim().toUpperCase()} ${m[2]}`);
+                }
               });
+            });
+          });
+
+          // --- Smart placement: start after the student's last taken semester ---
+
+          // 1. Find the latest semester that has a taken course (fall/spring only for placement)
+          const TERM_SEQ = ["fall", "spring"]; // skip summer for planned course placement
+          let lastTakenYear = 0;
+          let lastTakenTermIdx = -1;
+          Object.entries(base).forEach(([yId, yr]) => {
+            TERM_SEQ.forEach((t, ti) => {
+              const hasTaken = (yr[t]?.courses || []).some(c => c.status === "taken");
+              if (hasTaken) {
+                const y = parseInt(yId, 10);
+                if (y > lastTakenYear || (y === lastTakenYear && ti > lastTakenTermIdx)) {
+                  lastTakenYear = y;
+                  lastTakenTermIdx = ti;
+                }
+              }
+            });
+          });
+
+          // 2. Compute the next semester after that
+          const nextSem = (() => {
+            if (lastTakenYear === 0) return { year: 1, termIdx: 0 }; // no taken courses, start at Y1 Fall
+            const nextTermIdx = lastTakenTermIdx + 1;
+            if (nextTermIdx >= TERM_SEQ.length) return { year: lastTakenYear + 1, termIdx: 0 };
+            return { year: lastTakenYear, termIdx: nextTermIdx };
+          })();
+
+          // 3. Pre-analyze: find requirements already satisfied by taken courses so we skip placing them
+          const takenCoursesForAnalysis = [];
+          Object.values(base).forEach(yr => {
+            ['fall', 'spring', 'summer'].forEach(t => {
+              (yr[t]?.courses || []).forEach(c => {
+                if (c.status === 'taken' && c.name && c.credits > 0) {
+                  const m = c.name.match(/^([A-Z\s&/]{2,15})\s*(\d{3})/i);
+                  const code = m ? `${m[1].trim().toUpperCase()} ${m[2]}` : c.name.toUpperCase();
+                  takenCoursesForAnalysis.push({ ...c, code, id: c.id || `${c.name}-taken` });
+                }
+              });
+            });
+          });
+          const degreeReqsForAnalysis = [];
+          data.schedule.forEach(sem => {
+            (sem.courses || []).forEach(c => {
+              if (c.isNonCredit) return;
+              const rawName = c.raw || c.label || '';
+              const m = rawName.match(/^([A-Z\s&/]{2,15})\s*(\d{3})/i);
+              const code = m ? `${m[1].trim().toUpperCase()} ${m[2]}` : rawName.toUpperCase();
+              degreeReqsForAnalysis.push({ ...c, name: rawName, code, credits: c.credits || 0 });
+            });
+          });
+          const preAnalysis = analyzeDegreeProgress(takenCoursesForAnalysis, degreeReqsForAnalysis, {}, degreeMinGrade);
+          const alreadyMatchedReqNames = new Set(preAnalysis.matched.map(m => m.name));
+
+          // Also skip complex UCORE aggregate requirements (no [TAG] in name) — these are
+          // institutional audit requirements that can't be matched to a single course.
+          degreeReqsForAnalysis.forEach(req => {
+            if (req.requirementType === 'ucore-slot' && !/\[[A-Z]+\]/.test(req.name)) {
+              alreadyMatchedReqNames.add(req.name);
             }
           });
 
-          // Log counts per year/term before returning state
-          try {
-            const counts = Object.keys(base).map((y) => ({
-              year: y,
-              fall: (base[y].fall?.courses || []).length,
-              spring: (base[y].spring?.courses || []).length,
-              summer: (base[y].summer?.courses || []).length,
-            }));
-            console.log("newPlan populated counts", counts);
-          } catch (e) {
-            console.log("Error computing newPlan counts", e);
+          // 3b. Collect remaining courses from degree schedule IN ORDER (preserves prereq order)
+          const remaining = [];
+          data.schedule.forEach((semester) => {
+            semester.courses.forEach((course) => {
+              if (course.isNonCredit) return;
+              const rawName = course.raw || course.label || "";
+              // Skip if already satisfied by a taken course
+              if (alreadyMatchedReqNames.has(rawName)) return;
+              const codeMatch = rawName.match(/^([A-Z\s&/]{2,15})\s*(\d{3})/i);
+              if (codeMatch) {
+                const code = `${codeMatch[1].trim().toUpperCase()} ${codeMatch[2]}`;
+                if (existingCodes.has(code)) return;
+                existingCodes.add(code);
+              } else {
+                // Generic/elective — still include, use raw name as key to avoid dupes
+                if (existingCodes.has(`__${rawName}`)) return;
+                existingCodes.add(`__${rawName}`);
+              }
+              remaining.push({
+                id: Date.now() + Math.random(),
+                name: rawName,
+                credits: course.credits || 0,
+                grade: "",
+                status: "planned",
+                footnotes: course.footnotes || [],
+                prefix: course.prefix,
+                number: course.number,
+                attributes: course.attributes || [],
+                prerequisites: course.prerequisiteCodes || course.prerequisites || [],
+              });
+            });
+          });
+
+          // 4. Place remaining courses into semesters starting at nextSem, ~15 cr/sem
+          const MAX_CREDITS_PER_SEM = 15;
+          let curYear = nextSem.year;
+          let curTermIdx = nextSem.termIdx;
+          let semCredits = 0;
+
+          const advanceSemester = () => {
+            curTermIdx++;
+            if (curTermIdx >= TERM_SEQ.length) { curYear++; curTermIdx = 0; }
+            semCredits = 0;
+            // Ensure the year slot exists in base
+            if (!base[curYear]) {
+              base[curYear] = { fall: { courses: [] }, spring: { courses: [] }, summer: { courses: [] } };
+            }
+          };
+
+          // Ensure starting slot exists
+          if (!base[curYear]) {
+            base[curYear] = { fall: { courses: [] }, spring: { courses: [] }, summer: { courses: [] } };
           }
+
+          remaining.forEach((course) => {
+            // If adding this course would exceed limit, move to next semester
+            if (semCredits + (course.credits || 0) > MAX_CREDITS_PER_SEM && semCredits > 0) {
+              advanceSemester();
+            }
+            const term = TERM_SEQ[curTermIdx];
+            base[curYear][term].courses.push(course);
+            semCredits += course.credits || 0;
+          });
+
+          // Sync year tabs: add any new year IDs the placement created
+          const planYearIds = Object.keys(base).map(Number).sort((a, b) => a - b);
+          setYears(prev => {
+            const existingIds = new Set(prev.map(y => y.id));
+            const toAdd = planYearIds.filter(id => !existingIds.has(id)).map(id => ({ id, name: `Year ${id}` }));
+            return toAdd.length > 0 ? [...prev, ...toAdd].sort((a, b) => a.id - b.id) : prev;
+          });
 
           return base;
         });
@@ -706,6 +883,148 @@ function DegreePlanner() {
       setDegreePlan,
       setSelectedPrograms,
     });
+  };
+
+  // ── Transcript import ────────────────────────────────────────────────────
+  const [transcriptModal, setTranscriptModal] = useState(null); // null | { student, courses }
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [degreeSuggestModal, setDegreeSuggestModal] = useState(null); // null | { raw, candidates }
+
+  const handleImportTranscript = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = ''; // reset so same file can be re-uploaded
+    setTranscriptLoading(true);
+    const toastId = toast.loading('Parsing transcript…');
+    try {
+      const formData = new FormData();
+      formData.append('transcript', file);
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3008';
+      const res = await fetch(`${apiBase}/api/parse-transcript`, { method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Server error ${res.status}`);
+      }
+      const data = await res.json();
+      toast.success('Transcript parsed — review and confirm below', { id: toastId });
+      setTranscriptModal(data);
+    } catch (err) {
+      toast.error(`Transcript import failed: ${err.message}`, { id: toastId });
+    } finally {
+      setTranscriptLoading(false);
+    }
+  };
+
+  const applyTranscriptCourses = (courses) => {
+    const TERM_MAP = { fall: 1, spring: 2, summer: 3 };
+    const termFromString = (t) => {
+      if (!t) return { yearIdx: 0, term: 'fall' };
+      const lower = t.toLowerCase();
+      const yearMatch = t.match(/\d{4}/);
+      const calYear = yearMatch ? parseInt(yearMatch[0], 10) : 2022;
+      const term = lower.includes('spring') ? 'spring' : lower.includes('summer') ? 'summer' : 'fall';
+      // Map calendar year + term to academic year index (Year 1 = first fall)
+      // Find the earliest year across all courses to establish baseline
+      return { calYear, term };
+    };
+
+    // Determine academic year baseline (earliest fall = Year 1)
+    const calYears = courses.map(c => termFromString(c.term).calYear);
+    const minCal = Math.min(...calYears);
+
+    const academicYear = (calYear, term) => {
+      // Fall of minCal = Year 1 Fall; Spring/Summer after that fall = Year 1 Spring/Summer
+      // Fall of minCal+1 = Year 2 Fall, etc.
+      const fallYear = term === 'spring' || term === 'summer' ? calYear - 1 : calYear;
+      return Math.max(1, fallYear - minCal + 1);
+    };
+
+    setDegreePlan(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+
+      // Ensure enough year slots exist
+      const maxYear = Math.max(...courses.map(c => {
+        const { calYear, term } = termFromString(c.term);
+        return academicYear(calYear, term);
+      }));
+      setYears(y => {
+        const existing = y.map(yr => yr.id);
+        const extra = [];
+        for (let i = existing.length + 1; i <= maxYear; i++) {
+          extra.push({ id: i, name: `Year ${i}` });
+        }
+        return extra.length ? [...y, ...extra] : y;
+      });
+
+      // Build a set of course codes already in the plan to avoid duplicates
+      const existingCodes = new Set();
+      Object.values(next).forEach(yr => {
+        ['fall', 'spring', 'summer'].forEach(t => {
+          (yr[t]?.courses || []).forEach(c => {
+            if (c.name) existingCodes.add(c.name.trim().toUpperCase());
+          });
+        });
+      });
+
+      courses.forEach(course => {
+        const courseName = `${course.prefix} ${course.number}`;
+        if (existingCodes.has(courseName.toUpperCase())) return; // skip duplicate
+        existingCodes.add(courseName.toUpperCase());
+
+        const { calYear, term } = termFromString(course.term);
+        const yr = academicYear(calYear, term);
+        if (!next[yr]) next[yr] = { fall: { courses: [] }, spring: { courses: [] }, summer: { courses: [] } };
+        // Remove any empty placeholder slot
+        next[yr][term].courses = next[yr][term].courses.filter(c => c.name && c.name.trim() !== '');
+        next[yr][term].courses.push({
+          id: Date.now() + Math.random(),
+          name: courseName,
+          credits: course.credits || 0,
+          grade: course.grade || '',
+          status: course.grade ? 'taken' : 'planned',
+          attributes: course.ucore || [],
+        });
+      });
+
+      return next;
+    });
+
+    setTranscriptModal(null);
+    toast.success('Transcript courses added to your degree plan');
+
+    // Suggest degree from transcript — always ask, never auto-assume
+    if (transcriptModal?.student?.major && degrees.length > 0) {
+      const majorText = transcriptModal.student.major.toUpperCase();
+      // Strip degree-type prefixes only; strip punctuation so "Science," → "Science"
+      const stopWords = /\b(B\.?S\.?|B\.?A\.?|M\.?S\.?|BACHELOR|MASTER|OF|IN|THE|AND|OR)\b/gi;
+      const words = majorText
+        .replace(stopWords, '')
+        .replace(/[,;:.()]/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .filter(w => w.length > 2);
+
+      if (words.length > 0) {
+        const scored = degrees.map(d => {
+          const dName = d.name.toUpperCase();
+          // Whole-word match so "SCIENCE" doesn't match "SCIENCES"
+          const hits = words.filter(w => {
+            const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return new RegExp(`\\b${esc}\\b`).test(dName);
+          }).length;
+          return { degree: d, hits };
+        }).filter(s => s.hits > 0).sort((a, b) => b.hits - a.hits);
+
+        // Take top 3 candidates to show in the picker
+        const candidates = scored.slice(0, 3).map(s => s.degree);
+        if (candidates.length > 0) {
+          setDegreeSuggestModal({
+            raw: transcriptModal.student.major,
+            candidates,
+          });
+        }
+      }
+    }
   };
 
   // Reset / delete entire degree plan and selected programs
@@ -873,6 +1192,7 @@ function DegreePlanner() {
         onPrintPDF={handlePrintPDF}
         onExportICS={handleExportICS}
         onImport={handleImport}
+        onImportTranscript={handleImportTranscript}
         onReset={handleResetPlan}
         onWhatIf={() => setShowWhatIfModal(true)}
       />
@@ -886,6 +1206,9 @@ function DegreePlanner() {
         creditsPlanned={creditsPlanned}
         creditsRequired={creditsRequired}
         progress={progress}
+        belowMinGradeCount={progressAnalysis.belowMinGradeCount || 0}
+        degreeMinGrade={degreeMinGrade}
+        graduationProjection={graduationProjection}
       />
 
       {/* Degree Progress Bar */}
@@ -1192,6 +1515,144 @@ function DegreePlanner() {
         years={years}
         onMove={handleMoveCourse}
       />
+
+      {/* Transcript Review Modal */}
+      {transcriptModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-6 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col my-auto">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">Review Transcript</h2>
+                {transcriptModal.student && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {transcriptModal.student.name} · {transcriptModal.student.major}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setTranscriptModal(null)}
+                className="ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="px-4 pt-3 pb-1 text-xs text-gray-500 dark:text-gray-400">
+              Review courses extracted from your transcript. You can edit anything after importing.
+            </p>
+
+            {/* Sticky column header — outside the scroll container so it never moves */}
+            <div className="px-4">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                    <th className="text-left px-2 py-1.5 font-medium text-xs w-28">Course</th>
+                    <th className="text-left px-2 py-1.5 font-medium text-xs">Name</th>
+                    <th className="text-center px-2 py-1.5 font-medium text-xs w-8">Cr</th>
+                    <th className="text-center px-2 py-1.5 font-medium text-xs w-16">Grade</th>
+                    <th className="text-left px-2 py-1.5 font-medium text-xs w-24">Term</th>
+                  </tr>
+                </thead>
+              </table>
+            </div>
+
+            {/* Scrollable body only */}
+            <div className="overflow-y-auto px-4 pb-3" style={{ maxHeight: '52vh' }}>
+              <table className="w-full text-sm border-collapse">
+                <colgroup>
+                  <col className="w-28" />
+                  <col />
+                  <col className="w-8" />
+                  <col className="w-16" />
+                  <col className="w-24" />
+                </colgroup>
+                <tbody>
+                  {(transcriptModal.courses || []).map((c, i) => (
+                    <tr key={i} className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750">
+                      <td className="px-2 py-1 font-mono text-xs font-semibold text-blue-700 dark:text-blue-400 whitespace-nowrap">
+                        {c.prefix} {c.number}
+                      </td>
+                      <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300 max-w-[180px] truncate">{c.name}</td>
+                      <td className="px-2 py-1 text-center text-xs text-gray-700 dark:text-gray-300">{c.credits}</td>
+                      <td className="px-2 py-1 text-center">
+                        {c.grade ? (
+                          <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{c.grade}</span>
+                        ) : (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 italic">In Progress</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{c.term}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+              <button
+                onClick={() => setTranscriptModal(null)}
+                className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => applyTranscriptCourses(transcriptModal.courses || [])}
+                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+              >
+                Add {transcriptModal.courses?.length || 0} Courses to Plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Degree Suggestion Modal — shown after transcript import */}
+      {degreeSuggestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md">
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">What is your degree?</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Your transcript lists <strong>{degreeSuggestModal.raw}</strong>. Select the degree that matches, or skip to choose manually.
+              </p>
+            </div>
+            <div className="px-5 py-3 space-y-2">
+              {degreeSuggestModal.candidates.map((d) => {
+                const typeMap = { major: 'majors', minor: 'minors', certificate: 'certificates' };
+                const programType = typeMap[d.degree_type] || 'majors';
+                const typeLabelMap = { major: 'Major', minor: 'Minor', certificate: 'Certificate' };
+                const typeLabel = typeLabelMap[d.degree_type] || 'Major';
+                const typeColor = d.degree_type === 'minor' ? 'bg-green-100 text-green-700' : d.degree_type === 'certificate' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700';
+                return (
+                  <button
+                    key={d.id || `${d.name}-${d.degree_type}`}
+                    onClick={() => {
+                      setDegreeSuggestModal(null);
+                      handleAddProgram(programType, d.name);
+                    }}
+                    className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition text-sm text-gray-800 dark:text-gray-200 flex items-center justify-between"
+                  >
+                    <span>{d.name}</span>
+                    <span className={`ml-3 flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${typeColor}`}>
+                      {typeLabel}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+              <button
+                onClick={() => setDegreeSuggestModal(null)}
+                className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Skip — I'll pick my degree manually
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

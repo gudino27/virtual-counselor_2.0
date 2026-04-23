@@ -6,8 +6,27 @@ import { loadRecentCourses, saveRecentCourse } from '../../utils/storage';
 // Grade points for GPA calculation
 export const GRADE_POINTS = {
   'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
-  'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0, 'P': 0.0
+  'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0,
+  // P, S, U are pass/fail — no grade points, excluded from GPA
 };
+
+// All selectable grades including pass/fail (P/S/U don't appear in GRADE_POINTS)
+export const GRADE_OPTIONS = [
+  { value: 'A',  label: 'A'  },
+  { value: 'A-', label: 'A-' },
+  { value: 'B+', label: 'B+' },
+  { value: 'B',  label: 'B'  },
+  { value: 'B-', label: 'B-' },
+  { value: 'C+', label: 'C+' },
+  { value: 'C',  label: 'C'  },
+  { value: 'C-', label: 'C-' },
+  { value: 'D+', label: 'D+' },
+  { value: 'D',  label: 'D'  },
+  { value: 'F',  label: 'F'  },
+  { value: 'P',  label: 'P (Pass)'    },
+  { value: 'S',  label: 'S (Sat.)'   },
+  { value: 'U',  label: 'U (Unsat.)' },
+];
 
 // Debounce hook
 function useDebounce(callback, delay) {
@@ -535,7 +554,7 @@ function CourseRow({ course, onUpdate, onRemove, onMoveClick, yearId, term, open
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid gap-2" style={{gridTemplateColumns: '3rem 1fr 1fr 2.5rem'}}>
         <input
           type="number"
           value={course.credits || ''}
@@ -564,13 +583,13 @@ function CourseRow({ course, onUpdate, onRemove, onMoveClick, yearId, term, open
           className="select-field text-sm disabled:bg-gray-100"
         >
           <option value="">—</option>
-          {Object.keys(GRADE_POINTS).map(g => (
-            <option key={g} value={g}>{g}</option>
+          {GRADE_OPTIONS.map(g => (
+            <option key={g.value} value={g.value}>{g.label}</option>
           ))}
         </select>
 
         <div className="px-2 py-1 text-sm text-gray-600 dark:text-gray-400 text-right">
-          {course.grade && course.credits ? ((GRADE_POINTS[course.grade] || 0) * course.credits).toFixed(1) : '—'}
+          {course.grade && course.credits && course.grade in GRADE_POINTS ? (GRADE_POINTS[course.grade] * course.credits).toFixed(1) : '—'}
         </div>
       </div>
 

@@ -1,5 +1,48 @@
 import { GRADE_POINTS } from "../components/degree-planner/CourseRow";
 
+export const PASSING_GRADES = new Set(["A", "A-", "B+", "B", "B-", "C+", "C", "C-", "P", "S"]);
+
+// Grade ordering for minimum-grade comparisons (higher index = better grade)
+const GRADE_ORDER = ["C-", "C", "C+", "B-", "B", "B+", "A-", "A"];
+
+// Degrees that require better than C- in their core courses.
+// Keys are substrings matched against the uppercase degree name.
+// Value is the minimum letter grade needed for a course to count toward the major.
+export const DEGREE_GRADE_MINIMUMS = {
+  "COMPUTER SCIENCE": "C+",
+  "ELECTRICAL ENGINEERING": "C+",
+  "COMPUTER ENGINEERING": "C+",
+  "SOFTWARE ENGINEERING": "C+",
+  "MECHANICAL ENGINEERING": "C",
+  "CIVIL ENGINEERING": "C",
+  "CHEMICAL ENGINEERING": "C",
+  "DATA ANALYTICS": "C+",
+  "MATHEMATICS": "C",
+  "PHYSICS": "C",
+  "CHEMISTRY": "C",
+  "BIOLOGY": "C",
+  "BIOCHEMISTRY": "C",
+  "NEUROSCIENCE": "C",
+};
+
+export const getMinGradeForDegree = (degreeName) => {
+  if (!degreeName) return "C-";
+  const upper = degreeName.toUpperCase();
+  for (const [key, grade] of Object.entries(DEGREE_GRADE_MINIMUMS)) {
+    if (upper.includes(key)) return grade;
+  }
+  return "C-";
+};
+
+export const gradeMetMinimum = (grade, minGrade) => {
+  if (!grade || !minGrade) return true; // no grade yet / no minimum = no flag
+  if (grade === "P" || grade === "S") return true;
+  const gradeIdx = GRADE_ORDER.indexOf(grade);
+  const minIdx = GRADE_ORDER.indexOf(minGrade);
+  if (gradeIdx === -1 || minIdx === -1) return true; // unknown grade, don't flag
+  return gradeIdx >= minIdx;
+};
+
 /**
  * Calculates the GPA based on the degree plan.
  * @param {Object} degreePlan - The degree plan object.
@@ -12,8 +55,10 @@ export const calculateGPA = (degreePlan) => {
   Object.values(degreePlan).forEach((year) => {
     ["fall", "spring", "summer"].forEach((term) => {
       year[term]?.courses.forEach((course) => {
-        if (course.status === "taken" && course.grade && course.credits > 0) {
-          const points = (GRADE_POINTS[course.grade] || 0) * course.credits;
+        const NON_GPA_GRADES = new Set(['P', 'S', 'U', 'NC', 'W', 'I']);
+        if (course.status === "taken" && course.grade && course.credits > 0
+            && !NON_GPA_GRADES.has(course.grade) && course.grade in GRADE_POINTS) {
+          const points = GRADE_POINTS[course.grade] * course.credits;
           totalPoints += points;
           totalCredits += course.credits;
         }
@@ -37,7 +82,7 @@ export const calculateCreditsAchieved = (degreePlan) => {
         if (
           course.status === "taken" &&
           course.grade &&
-          ["A", "A-", "B+", "B", "B-", "C+", "C", "P"].includes(course.grade)
+          PASSING_GRADES.has(course.grade)
         ) {
           credits += course.credits || 0;
         }
@@ -176,7 +221,7 @@ export const getDuplicateCourses = (degreePlan) => {
  * @param {Object} refinements - Manual overrides/refinements
  * @returns {Object} { matched, missing, missingCredits, totalRequiredCredits }
  */
-export const analyzeDegreeProgress = (userCourses, requiredCourses, refinements = {}) => {
+export const analyzeDegreeProgress = (userCourses, requiredCourses, refinements = {}, minGrade = null) => {
   const matched = [];
   const missing = [];
   const usedUserCourseIds = new Set();
@@ -184,9 +229,8 @@ export const analyzeDegreeProgress = (userCourses, requiredCourses, refinements 
   // Create a copy of userCourses and SORT by priority
   // Priority: Taken & Passing > In-Progress > Planned > Not-Taken/Failed
   // This ensures requirements grab the "best" available course first.
-  const passingGrades = new Set(["A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "P", "S"]); // Typical passing
   const getScore = (c) => {
-      if (c.status === "taken" && c.grade && passingGrades.has(c.grade)) return 4;
+      if (c.status === "taken" && c.grade && PASSING_GRADES.has(c.grade)) return 4;
       if (c.status === "in-progress") return 3;
       if (c.status === "planned") return 2;
       return 1; // Failed or not taken
@@ -233,7 +277,7 @@ export const analyzeDegreeProgress = (userCourses, requiredCourses, refinements 
         );
      }
 
-     // Priority 3: Partial/OR Match
+     // Priority 3: Partial/OR Match — user course code appears in requirement label
      if (!matchFound) {
         matchFound = sortedUserCourses.find(uc => {
             if (usedUserCourseIds.has(uc.id)) return false;
@@ -243,8 +287,62 @@ export const analyzeDegreeProgress = (userCourses, requiredCourses, refinements 
         });
      }
 
+     // Priority 4: Footnote match — eligible courses listed in footnote text
+     // e.g. "Lab Science Requirement" footnote lists PHYSICS 201, BIOL 106, CHEM 105
+     if (!matchFound && req.footnotes && req.footnotes.length > 0) {
+        const footnoteText = req.footnotes.join(' ').toUpperCase();
+        const codeRegex = /\b([A-Z]{2,8}(?:\s+[A-Z]+)*\s+\d{3})\b/g;
+        const footnoteCodes = new Set();
+        let fm;
+        while ((fm = codeRegex.exec(footnoteText)) !== null) {
+            footnoteCodes.add(fm[1].replace(/\s+/g, ' ').trim());
+        }
+        if (footnoteCodes.size > 0) {
+            matchFound = sortedUserCourses.find(uc =>
+                !usedUserCourseIds.has(uc.id) && footnoteCodes.has(uc.code)
+            );
+        }
+     }
+
+     // Priority 5: Named elective / elective bucket — match unmatched courses by prefix + level
+     // e.g. "CPT S Technical Elective" matches any unused CPT S 300-400 level course
+     // e.g. "Computer Science Electives" matches any unused 300-400 level course in approved prefixes
+     if (!matchFound && (req.requirementType === 'elective-bucket' || req.requirementType === 'named-elective')) {
+        // Extract leading department prefix only if it's already uppercase (real dept code like "CPT S", "MATH").
+        // Mixed-case names like "Computer Science Electives" intentionally produce no prefix → match any 300+ level course.
+        const prefixMatch = req.name.match(/^([A-Z]{2,8}(?:\s+[A-Z]{1,2})?)\s+/);
+        const reqPrefix = prefixMatch ? prefixMatch[1] : null;
+
+        matchFound = sortedUserCourses.find(uc => {
+            if (usedUserCourseIds.has(uc.id)) return false;
+            // Course must be at 300+ level
+            const levelMatch = uc.code.match(/(\d{3})$/);
+            if (!levelMatch || parseInt(levelMatch[1], 10) < 300) return false;
+            // If requirement names a specific department, course prefix must match
+            if (reqPrefix && !uc.code.toUpperCase().startsWith(reqPrefix.toUpperCase())) return false;
+            return true;
+        });
+     }
+
+     // Priority 6: UCORE slot — match by UCORE attribute tag on the course
+     // e.g. "UCORE Inquiry [HUM]" matches any course the student has with [HUM] attribute
+     if (!matchFound && req.requirementType === 'ucore-slot') {
+        const ucoreMatch = (req.name || req.code || '').match(/\[([A-Z]+)\]/);
+        if (ucoreMatch) {
+            const attr = ucoreMatch[1].toUpperCase();
+            matchFound = sortedUserCourses.find(uc => {
+                if (usedUserCourseIds.has(uc.id)) return false;
+                const attrs = [].concat(uc.attributes || uc.ucore || []).map(a => a.toString().toUpperCase());
+                return attrs.includes(attr);
+            });
+        }
+     }
+
      if (matchFound) {
-        matched.push({ ...req, matchedCourse: matchFound });
+        const belowMinGrade = minGrade && matchFound.grade
+          ? !gradeMetMinimum(matchFound.grade, minGrade)
+          : false;
+        matched.push({ ...req, matchedCourse: matchFound, belowMinGrade });
         // Only mark as used if it's a real course (not a manual "true" override)
         if (matchFound.id && !matchFound.id.toString().startsWith('manual-')) {
             usedUserCourseIds.add(matchFound.id);
@@ -256,12 +354,14 @@ export const analyzeDegreeProgress = (userCourses, requiredCourses, refinements 
 
   const missingCredits = missing.reduce((sum, c) => sum + (c.credits || 0), 0);
   const totalRequiredCredits = requiredCourses.reduce((sum, c) => sum + (c.credits || 0), 0);
+  const belowMinGradeCount = matched.filter(m => m.belowMinGrade).length;
 
   return {
     matched,
     missing,
     missingCredits,
     totalRequiredCredits,
+    belowMinGradeCount,
     usedUserCourseIds
   };
 };

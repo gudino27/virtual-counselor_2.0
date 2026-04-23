@@ -10,6 +10,7 @@ export default function DegreePlannerHeader({
   onPrintPDF,
   onExportICS,
   onImport,
+  onImportTranscript,
   onReset,
   onWhatIf,
 }) {
@@ -114,15 +115,36 @@ export default function DegreePlannerHeader({
         </div>
       </div>
 
-      <label className="w-full sm:w-auto flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition cursor-pointer touch-manipulation text-sm">
-        <span>Import</span>
-        <input
-          type="file"
-          accept=".xlsx"
-          onChange={onImport}
-          className="hidden"
-        />
-      </label>
+      {/* Import Dropdown */}
+      <div className="relative group inline-block text-left w-full sm:w-auto">
+        <button
+          type="button"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition touch-manipulation text-sm"
+        >
+          <span>Import</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div className="hidden group-hover:block absolute right-0 mt-0 w-52 bg-white rounded-md shadow-lg z-50 border border-gray-200">
+          <div className="py-1">
+            <label className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+              <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Import Plan (.xlsx)
+              <input type="file" accept=".xlsx" onChange={onImport} className="hidden" />
+            </label>
+            <label className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer border-t border-gray-100">
+              <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Import WSU Transcript (.pdf)
+              <input type="file" accept=".pdf" onChange={onImportTranscript} className="hidden" />
+            </label>
+          </div>
+        </div>
+      </div>
       <button
         onClick={onReset}
         className="w-full sm:w-auto px-3 py-2 sm:px-3 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition touch-manipulation text-sm"

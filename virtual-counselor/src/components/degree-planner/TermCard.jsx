@@ -108,8 +108,8 @@ function TermCard({ title, term, yearId, courses, degreePlan, setDegreePlan, ope
 
       <div className="text-sm text-gray-600 mb-3">
         {totalCredits} credits
-        {totalCredits > 23 && (
-          <div className="text-xs text-orange-600 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Advisor approval required</div>
+        {totalCredits > 18 && (
+          <div className="text-xs text-orange-600 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Advisor approval required (overload &gt;18 cr)</div>
         )}
       </div>
 

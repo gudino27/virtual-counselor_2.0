@@ -7,7 +7,11 @@ const path = require('path');
 const fs = require('fs');
 const { logger, httpLogger } = require('./logger');
 require('dotenv').config({ path: '.env.production' });
+require('dotenv').config({ path: 'prompt-search/.env' }); // ANTHROPIC_API_KEY, NVIDIA_API_KEY
 const axios = require('axios');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const Anthropic = require('@anthropic-ai/sdk');
 
 // Security: Validate required environment variables
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
@@ -941,7 +945,9 @@ app.get('/api/degrees', async (req, res) => {
 app.get('/api/degree-requirements', async (req, res) => {
   try {
     const rawType = req.query.type;
-    const type = typeof rawType === 'string' ? rawType : 'degree';
+    // Normalize "major" -> "degree" for backwards compat
+    const typeRaw = typeof rawType === 'string' ? rawType : 'degree';
+    const type = typeRaw === 'major' ? 'degree' : typeRaw;
     const { name, acadUnitId: providedAcadUnitId } = req.query;
 
     if (!['degree', 'minor', 'certificate'].includes(type)) {
@@ -984,11 +990,18 @@ app.get('/api/degree-requirements', async (req, res) => {
         // We have saved requirements - use them!
         console.log(`[OK] Loaded ${requirements.length} course requirements from database for "${name}"`);
         
-        // Group by year and term
+        // Group by year and term (deduplicate identical rows from DB)
         const coursesByYearTerm = {};
         let totalCredits = 0;
-        
+        const seen = new Set();
+
         for (const item of requirements) {
+          const label = normalizeLabel(item.label);
+          if (!label) continue; // skip empty rows
+          const dedupeKey = `${item.year}|${item.term}|${label}|${item.hours}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
+
           const key = `${item.year}-${item.term}`;
           if (!coursesByYearTerm[key]) {
             coursesByYearTerm[key] = {
@@ -998,10 +1011,10 @@ app.get('/api/degree-requirements', async (req, res) => {
               courses: []
             };
           }
-          
-          const credits = item.hours ? parseInt(item.hours, 10) : null;
-          const courseInfo = parseCourseLabel(item.label, credits);
-          
+
+          const creditHours = parseHours(item.hours);
+          const courseInfo = parseCourseLabel(label, creditHours);
+
           // Parse footnotes from JSON
           if (item.footnotes) {
             try {
@@ -1012,14 +1025,14 @@ app.get('/api/degree-requirements', async (req, res) => {
           } else {
             courseInfo.footnotes = [];
           }
-          
-          // Only add courses that have credits
-          if (credits && credits > 0) {
+
+          // Milestones/advisories go in but skipped during credit tally
+          if (courseInfo.requirementType === 'filter') continue;
+          if (courseInfo.isNonCredit || courseInfo.requirementType === 'milestone' || courseInfo.requirementType === 'advisory') {
             coursesByYearTerm[key].courses.push(courseInfo);
-            totalCredits += credits;
-          } else if (!credits) {
-            courseInfo.isNonCredit = true;
+          } else {
             coursesByYearTerm[key].courses.push(courseInfo);
+            totalCredits += creditHours.min || 0;
           }
         }
         
@@ -1154,11 +1167,18 @@ app.get('/api/degree-requirements', async (req, res) => {
       });
     }
     
-    // Parse the sequence items into a more usable format
+    // Parse the sequence items into a more usable format (WSU API fallback path)
     const coursesByYearTerm = {};
     let totalCredits = 0;
-    
+    const seenApi = new Set();
+
     for (const item of (program.sequenceItems || [])) {
+      const label = normalizeLabel(item.label);
+      if (!label) continue;
+      const dedupeKey = `${item.year}|${item.term}|${label}|${item.hours}`;
+      if (seenApi.has(dedupeKey)) continue;
+      seenApi.add(dedupeKey);
+
       const key = `${item.year}-${item.term}`;
       if (!coursesByYearTerm[key]) {
         coursesByYearTerm[key] = {
@@ -1168,24 +1188,15 @@ app.get('/api/degree-requirements', async (req, res) => {
           courses: []
         };
       }
-      
-      // Parse the course label to extract prefix, number, credits, and attributes
-      // Credits come from the 'hours' field in the API response
-      const credits = item.hours ? parseInt(item.hours, 10) : null;
-      const courseInfo = parseCourseLabel(item.label, credits);
-      
-      // Add footnotes to the course info
+
+      const creditHours = parseHours(item.hours);
+      const courseInfo = parseCourseLabel(label, creditHours);
       courseInfo.footnotes = item.footnotes || [];
-      
-      // Only add courses that have credits (skip non-credit milestones)
-      if (credits && credits > 0) {
-        coursesByYearTerm[key].courses.push(courseInfo);
-        totalCredits += credits;
-      } else if (!credits) {
-        // For UCORE requirements and electives without specific credits
-        // Include them but mark as variable credit
-        courseInfo.isNonCredit = true;
-        coursesByYearTerm[key].courses.push(courseInfo);
+
+      if (courseInfo.requirementType === 'filter') continue;
+      coursesByYearTerm[key].courses.push(courseInfo);
+      if (!courseInfo.isNonCredit && courseInfo.requirementType !== 'milestone' && courseInfo.requirementType !== 'advisory') {
+        totalCredits += creditHours.min || 0;
       }
     }
     
@@ -1484,56 +1495,256 @@ app.post('/api/rmp-proxy', rmpLimiter, async (req, res) => {
 
 // Helper function to parse course labels like "CPT S 121 [QUAN]" or "CPT S 121 or 131"
 // credits parameter is the hours value from the API
-function parseCourseLabel(label, credits = null) {
-  if (!label) return { raw: '', prefix: '', number: '', credits: null, attributes: [] };
-  
+/**
+ * Parse the raw hours string from degree_requirements into a structured credit range.
+ * Handles all DB formats found across WSU degree data:
+ *   "3", " 3 " (whitespace), "3 or 4", "4 or 3" (reversed), "2-3", "2 - 3",
+ *   "2- 3" (malformed), "3 - 0" (inverted), "0 or 1" (conditional), "10-12", etc.
+ * Returns { min, max, display, isVariable, isConditional }
+ */
+function parseHours(raw) {
+  if (!raw && raw !== 0) return { min: null, max: null, display: null, isVariable: false, isConditional: false };
+  const s = String(raw).replace(/[\t\n\r]/g, ' ').trim();
+  if (!s) return { min: null, max: null, display: null, isVariable: false, isConditional: false };
+
+  // "X or Y" or "X Or Y" — space-or-space
+  const orMatch = s.match(/^(\d+)\s+or\s+(\d+)\s*$/i);
+  if (orMatch) {
+    const a = parseInt(orMatch[1], 10), b = parseInt(orMatch[2], 10);
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    return { min: lo, max: hi, display: `${lo}–${hi}`, isVariable: lo !== hi, isConditional: lo === 0 };
+  }
+
+  // "X-Y" or "X - Y" or "X- Y" — dash range
+  const dashMatch = s.match(/^(\d+)\s*-\s*(\d+)\s*$/);
+  if (dashMatch) {
+    const a = parseInt(dashMatch[1], 10), b = parseInt(dashMatch[2], 10);
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    return { min: lo, max: hi, display: `${lo}–${hi}`, isVariable: lo !== hi, isConditional: lo === 0 };
+  }
+
+  // Plain integer
+  const numMatch = s.match(/^(\d+)$/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    return { min: n, max: n, display: String(n), isVariable: false, isConditional: false };
+  }
+
+  // Fallback: try parsing leading digits
+  const leadMatch = s.match(/^(\d+)/);
+  const n = leadMatch ? parseInt(leadMatch[1], 10) : 0;
+  return { min: n, max: n, display: s, isVariable: false, isConditional: false };
+}
+
+// UCORE category codes recognized in WSU degree data
+const UCORE_CODES = new Set(['WRTG','QUAN','BSCI','PSCI','HUM','ARTS','DIVR','CAPS','ROOT','EQJS','COMM','SSCI','IQSK','M']);
+
+// Milestones: labels that look like administrative actions (no credit content)
+const MILESTONE_PATTERNS = [
+  /^complete\b/i, /^apply\b/i, /^consider\b/i, /^earn\b/i, /^pass\b/i,
+  /^submit\b/i, /^attend\b/i, /^meet\b/i, /^schedule\b/i, /^register\b/i,
+  /^exit interview/i, /^writing portfolio/i,
+];
+
+/**
+ * Normalize a raw label string: collapse whitespace, newlines, tabs from PDF extraction artifacts.
+ */
+function normalizeLabel(raw) {
+  if (!raw) return '';
+  return raw.replace(/[\t\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+}
+
+/**
+ * Parse a degree requirement label into a structured course info object.
+ * Classifies requirement type and extracts all relevant metadata.
+ */
+function parseCourseLabel(label, creditHours = null) {
+  const normalized = normalizeLabel(label);
+
   const result = {
-    raw: label,
+    raw: normalized,
     prefix: '',
     number: '',
-    credits: credits, // Use the hours value from API
+    credits: typeof creditHours === 'number' ? creditHours : (creditHours?.min ?? null),
+    creditMin: creditHours?.min ?? (typeof creditHours === 'number' ? creditHours : null),
+    creditMax: creditHours?.max ?? (typeof creditHours === 'number' ? creditHours : null),
+    creditDisplay: creditHours?.display ?? (creditHours !== null ? String(creditHours) : null),
+    isVariable: creditHours?.isVariable ?? false,
+    isConditional: creditHours?.isConditional ?? false,
     attributes: [],
+    ucoreCategories: [],
+    requirementType: 'fixed', // fixed | or-choice | compound-and-or | ucore-slot | elective-bucket | named-elective | milestone | advisory | conditional
     isChoice: false,
-    alternatives: []
+    alternatives: [],
+    orOptions: [],        // parsed option objects for or-choice
+    isNonCredit: false,
+    isMajorReq: false,   // [M] marker
+    isCaps: false,       // [CAPS] marker
   };
-  
-  // Extract attributes like [WRTG], [QUAN], etc.
-  const attrMatch = label.match(/\[([A-Z]+)\]/g);
-  if (attrMatch) {
-    result.attributes = attrMatch.map(a => a.replace(/[\[\]]/g, ''));
+
+  if (!normalized) {
+    result.requirementType = 'filter';
+    return result;
   }
-  
-  // Remove attributes from label for further parsing
-  let cleanLabel = label.replace(/\s*\[[A-Z]+\]/g, '').trim();
-  
-  // Check if it's a choice (contains "or")
-  if (cleanLabel.toLowerCase().includes(' or ')) {
-    result.isChoice = true;
-    const parts = cleanLabel.split(/\s+or\s+/i);
-    result.alternatives = parts.map(p => p.trim());
-  }
-  
-  // Credits are now passed from the API's hours field
-  // Only try to extract from label if not already set
-  if (!result.credits) {
-    const creditsMatch = cleanLabel.match(/\s(\d+)$/);
-    if (creditsMatch) {
-      result.credits = parseInt(creditsMatch[1], 10);
-      cleanLabel = cleanLabel.replace(/\s\d+$/, '').trim();
+
+  // Check for milestone pattern (empty/null credits + milestone-like text)
+  if (creditHours === null || (creditHours?.min === null)) {
+    if (MILESTONE_PATTERNS.some(p => p.test(normalized))) {
+      result.requirementType = 'milestone';
+      result.isNonCredit = true;
+      return result;
     }
   }
-  
-  // Try to extract prefix and number
-  // Pattern: "PREFIX NUMBER" like "CPT S 121", "MATH 171", "ENGLISH 101"
-  const courseMatch = cleanLabel.match(/^([A-Z]+(?:\s+[A-Z])?)\s+(\d+\w*)/i);
-  if (courseMatch) {
-    result.prefix = courseMatch[1].toUpperCase();
-    result.number = courseMatch[2];
-  } else {
-    // Just store the whole thing
-    result.prefix = cleanLabel;
+
+  // Extract bracket markers: [WRTG], [M], [CAPS], [DIVR], etc.
+  const bracketMatches = normalized.match(/\[([A-Z]+)\]/g) || [];
+  for (const bm of bracketMatches) {
+    const code = bm.slice(1, -1);
+    if (code === 'M') { result.isMajorReq = true; continue; }
+    if (code === 'CAPS') { result.isCaps = true; result.ucoreCategories.push('CAPS'); continue; }
+    if (UCORE_CODES.has(code)) result.ucoreCategories.push(code);
+    result.attributes.push(code);
   }
-  
+
+  // Strip brackets for label parsing
+  let clean = normalized.replace(/\s*\[[A-Z]+\]/g, '').trim();
+
+  // Detect "and … , or …" compound pattern (e.g. "PHYSICS 201 and 211, or 205")
+  const andOrMatch = clean.match(/\band\b.+,\s*or\b|\bor\b.+\band\b/i);
+  if (andOrMatch) {
+    result.requirementType = 'compound-and-or';
+    result.isChoice = true;
+    result.alternatives = [clean];
+    result.orOptions = [{ label: clean, type: 'compound' }];
+    // Extract first course prefix for prefix field
+    const firstCourse = clean.match(/^([A-Z][A-Z\s]*[A-Z]|[A-Z]+)\s+(\d+)/i);
+    if (firstCourse) { result.prefix = firstCourse[1].trim().toUpperCase(); result.number = firstCourse[2]; }
+    return result;
+  }
+
+  // Detect or-choice: split on " or " boundary
+  const hasOr = /\bor\b/i.test(clean);
+  const hasCommaOr = /,\s*or\b/i.test(clean);
+
+  if (hasOr || hasCommaOr) {
+    // Split: first split on ", or " then on " or "
+    let rawParts;
+    if (hasCommaOr) {
+      rawParts = clean.split(/,\s*or\s*/i);
+    } else {
+      rawParts = clean.split(/\s+or\s+/i);
+    }
+    // Further split on plain " or " within parts (handles "A or B or C" without commas)
+    const parts = [];
+    for (const rp of rawParts) {
+      const sub = rp.split(/\s+or\s+/i);
+      parts.push(...sub.map(s => s.trim()).filter(Boolean));
+    }
+
+    if (parts.length >= 2) {
+      result.isChoice = true;
+      result.alternatives = parts;
+
+      // Try to identify if any part is a UCORE category (no course number)
+      const courseNumRe = /\d{3}/;
+      const isUcore = (str) => !courseNumRe.test(str) && /[A-Z]/.test(str);
+      const allUcore = parts.every(p => isUcore(p));
+      const someUcore = parts.some(p => isUcore(p));
+      const allCourses = parts.every(p => courseNumRe.test(p));
+
+      // Build orOptions with prefix inference
+      result.orOptions = parts.map(p => {
+        const courseM = p.match(/^([A-Z][A-Z\s]*[A-Z]|[A-Z]+)\s+(\d+\w*)/i);
+        if (courseM) return { prefix: courseM[1].trim().toUpperCase(), number: courseM[2], label: p, type: 'course' };
+        return { prefix: '', number: '', label: p, type: isUcore(p) ? 'ucore-category' : 'elective' };
+      });
+
+      if (allUcore) {
+        result.requirementType = 'ucore-or-ucore';
+      } else if (someUcore && !allCourses) {
+        result.requirementType = 'ucore-or-elective';
+      } else {
+        result.requirementType = 'or-choice';
+      }
+
+      // Set prefix/number from first course option
+      const firstCourse = result.orOptions.find(o => o.type === 'course');
+      if (firstCourse) { result.prefix = firstCourse.prefix; result.number = firstCourse.number; }
+      return result;
+    }
+  }
+
+  // No "or" — check for UCORE/category-only slot
+  const courseNumRe = /\d{3}/;
+  if (!courseNumRe.test(clean)) {
+    // No course number — classify as ucore-slot, named-elective, milestone, or advisory
+    const lc = clean.toLowerCase();
+
+    // Advisory: advisory language
+    if (/^consider\b|^note:|^see |^visit |^check /.test(lc)) {
+      result.requirementType = 'advisory';
+      result.isNonCredit = true;
+      return result;
+    }
+    // Milestone: milestone language (no credits)
+    if (MILESTONE_PATTERNS.some(p => p.test(lc)) || (result.creditMin === null || result.creditMin === 0 && result.creditMax === 0)) {
+      if (result.creditMin === null || (result.creditMin === 0 && result.creditMax === 0 && !result.isConditional)) {
+        result.requirementType = 'milestone';
+        result.isNonCredit = true;
+        result.prefix = clean;
+        return result;
+      }
+    }
+    // UCORE by bracket tag already extracted
+    if (result.ucoreCategories.length > 0) {
+      result.requirementType = 'ucore-slot';
+      result.prefix = clean;
+      return result;
+    }
+    // UCORE by full name
+    const ucoreByName = {
+      'quantitative reasoning': 'QUAN', 'written communication': 'WRTG',
+      'communication': 'COMM', 'arts': 'ARTS', 'humanities': 'HUM',
+      'diversity': 'DIVR', 'biological sciences': 'BSCI',
+      'physical sciences': 'PSCI', 'roots': 'ROOT', 'equity and justice': 'EQJS',
+      'ucore inquiry': 'IQSK', 'social sciences': 'SSCI',
+    };
+    for (const [name, code] of Object.entries(ucoreByName)) {
+      if (lc.includes(name)) {
+        result.requirementType = 'ucore-slot';
+        result.ucoreCategories.push(code);
+        result.attributes.push(code);
+        result.prefix = clean;
+        return result;
+      }
+    }
+    // Named elective / program category / elective bucket
+    const isElective = /elective|electives|option|options|biocore|program\s+option/i.test(clean);
+    if (isElective) {
+      result.requirementType = 'elective-bucket';
+    } else {
+      result.requirementType = 'named-elective';
+    }
+    result.prefix = clean;
+    return result;
+  }
+
+  // Has a course number — extract prefix + number
+  // Handles: "CPT S 121", "MATH 171", "NURS FPC 306", "H D 101", "E E 214", "B A 100"
+  const courseMatch = clean.match(/^([A-Z][A-Z\s]*?)\s+(\d{3}\w*)\b/i);
+  if (courseMatch) {
+    result.prefix = courseMatch[1].trim().toUpperCase();
+    result.number = courseMatch[2];
+    // Check for trailing description after number (e.g. "DATA 498 Internship")
+    const afterNumber = clean.slice(courseMatch[0].length).trim();
+    if (afterNumber && !/^\d/.test(afterNumber)) {
+      result.description = afterNumber;
+    }
+  } else {
+    result.prefix = clean;
+  }
+
+  result.requirementType = 'fixed';
   return result;
 }
 
@@ -3230,6 +3441,109 @@ process.on('SIGINT', () => {
     }
     process.exit(0);
   });
+});
+
+// ── Transcript Upload ──────────────────────────────────────────────────────
+const transcriptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('Only PDF files are accepted'));
+  },
+});
+
+app.post('/api/parse-transcript', transcriptUpload.single('transcript'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No PDF file uploaded' });
+
+    const pdfData = await pdfParse(req.file.buffer);
+    const rawText = pdfData.text;
+
+    if (!rawText || rawText.trim().length < 50) {
+      return res.status(422).json({ error: 'Could not extract text from PDF' });
+    }
+
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      system: [
+        {
+          type: 'text',
+          text: `You are parsing a WSU (Washington State University) unofficial academic transcript PDF.
+Extract ALL courses the student has taken or is currently enrolled in.
+
+Rules:
+- Include courses with grades (completed) and courses with no grade yet (in-progress/current semester).
+- If a course appears multiple times (repeated), include only the instance where credits were EARNED (earned credits > 0). If all attempts show 0 earned credits, include the most recent.
+- Course codes use underscore in the PDF (e.g. CPT_S 121) — convert to standard space format (e.g. CPT S 121).
+- Grade for in-progress courses: use empty string "".
+- Credits: use the numeric credit value (e.g. 3, 4). Use 0 only if the course is truly 0-credit.
+- Term format: use "Fall YYYY", "Spring YYYY", "Summer YYYY".
+
+Return ONLY valid JSON, no explanation. Format:
+{
+  "student": { "name": "...", "id": "...", "major": "..." },
+  "courses": [
+    {
+      "prefix": "CPT S",
+      "number": "121",
+      "name": "Intro to Program Design & Dev",
+      "credits": 4,
+      "grade": "A",
+      "term": "Fall 2022"
+    }
+  ]
+}`,
+          cache_control: { type: 'ephemeral' }
+        }
+      ],
+      messages: [{
+        role: 'user',
+        content: `TRANSCRIPT TEXT:\n${rawText.slice(0, 12000)}`
+      }]
+    });
+
+    const responseText = message.content[0]?.text || '';
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return res.status(502).json({ error: 'Failed to parse transcript structure' });
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Enrich courses with credit amounts from our DB where available
+    const enriched = await Promise.all((parsed.courses || []).map(async (c) => {
+      try {
+        const normalizedPrefix = c.prefix.toUpperCase().replace(/\s+/g, '');
+        const row = await dbGet(
+          `SELECT minUnits, maxUnits, title, ucore FROM catalog_courses
+           WHERE UPPER(REPLACE(prefix,' ','')) = ? AND courseNumber = ?
+           ORDER BY catalog_year DESC LIMIT 1`,
+          [normalizedPrefix, c.number]
+        );
+        if (row) {
+          const ucoreArr = row.ucore
+            ? row.ucore.split(',').map(s => s.trim()).filter(Boolean)
+            : [];
+          return {
+            ...c,
+            credits: c.credits || row.minUnits || 0,
+            creditMin: row.minUnits,
+            creditMax: row.maxUnits,
+            dbTitle: row.title,
+            ucore: ucoreArr,
+          };
+        }
+      } catch (_) {}
+      return c;
+    }));
+
+    res.json({ student: parsed.student, courses: enriched });
+  } catch (err) {
+    console.error('[parse-transcript] error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Start server

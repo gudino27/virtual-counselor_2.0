@@ -1,10 +1,20 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { fetchCourses, fetchTerms, fetchPrefixes } from '../utils/api';
-import { saveUserCourses, loadUserCourses } from '../utils/storage';
+import { loadUserCourses } from '../utils/storage';
 import WeeklyCalendar from './course-planner/WeeklyCalendar';
 import CourseDetailsModal from './course-planner/CourseDetailsModal';
 import { stripHtml, parseInstructors, formatDayTime, parseTimeRange, getContrastingTextColor } from './course-planner/utils';
+
+// Per-semester schedule storage
+const SCHEDULES_KEY = 'vcSchedulesByTerm';
+function termKey(year, term) { return `${year}_${term}`; }
+function loadAllSchedules() {
+  try { return JSON.parse(localStorage.getItem(SCHEDULES_KEY) || '{}'); } catch { return {}; }
+}
+function saveAllSchedules(data) {
+  try { localStorage.setItem(SCHEDULES_KEY, JSON.stringify(data)); } catch (_) {}
+}
 
 // Course color presets (hex) for visual differentiation. Values are CSS color strings or gradients.
 const COURSE_COLOR_PRESETS = [
@@ -60,21 +70,28 @@ function CoursePlanner() {
   const [totalResults, setTotalResults] = useState(0);
   const [showSubjectName, setShowSubjectName] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [allScheduleKeys, setAllScheduleKeys] = useState([]);
+  const activeTermKey = useRef(termKey(filters.year, filters.term));
 
-  // Load saved schedule from localStorage
+  // Load saved schedule for the initial term on mount
   useEffect(() => {
     try {
-      const parsed = loadUserCourses();
-      console.debug('[CoursePlanner] loaded saved courses', parsed && parsed.courses ? parsed.courses.length : (Array.isArray(parsed) ? parsed.length : 0));
-      if (parsed && parsed.length !== undefined) {
-        // older storage returned array directly
-        setSelectedCourses(parsed || []);
-      } else if (parsed && parsed.courses) {
-        setSelectedCourses(parsed.courses || []);
-        setCourseColors(parsed.colors || {});
-        setFilters(prev => ({ ...prev, ...parsed.filters }));
+      const all = loadAllSchedules();
+      const key = termKey(filters.year, filters.term);
+      const saved = all[key];
+      if (saved) {
+        setSelectedCourses(saved.courses || []);
+        setCourseColors(saved.colors || {});
+      } else {
+        // Migrate from legacy single-slot storage on first load
+        const legacy = loadUserCourses();
+        if (legacy?.courses?.length) {
+          setSelectedCourses(legacy.courses);
+          setCourseColors(legacy.colors || {});
+        }
       }
-      // mark hydration complete so we don't immediately overwrite saved data
+      activeTermKey.current = key;
+      setAllScheduleKeys(Object.keys(all));
       setHydrated(true);
     } catch (e) {
       console.error('Error loading saved schedule:', e);
@@ -82,20 +99,29 @@ function CoursePlanner() {
     }
   }, []);
 
-  // Save schedule to localStorage
+  // When term/year changes, save the current schedule and load the new one
   useEffect(() => {
-    try {
-      if (!hydrated) {
-        console.debug('[CoursePlanner] skipping save until hydrated');
-        return;
-      }
+    if (!hydrated) return;
+    const newKey = termKey(filters.year, filters.term);
+    if (newKey === activeTermKey.current) return;
+    activeTermKey.current = newKey;
+    const all = loadAllSchedules();
+    const saved = all[newKey] || { courses: [], colors: {} };
+    setSelectedCourses(saved.courses);
+    setCourseColors(saved.colors);
+  }, [filters.year, filters.term, hydrated]);
 
-      console.debug('[CoursePlanner] saving selectedCourses', selectedCourses.length);
-      saveUserCourses({ courses: selectedCourses, colors: courseColors, filters: { term: filters.term, year: filters.year, campus: filters.campus } });
-    } catch (e) {
-      console.error('Error saving schedule:', e);
+  // Auto-save whenever courses or colors change
+  useEffect(() => {
+    if (!hydrated) return;
+    const all = loadAllSchedules();
+    all[activeTermKey.current] = { courses: selectedCourses, colors: courseColors };
+    if (!selectedCourses.length) {
+      delete all[activeTermKey.current];
     }
-  }, [selectedCourses, courseColors, filters.term, filters.year, filters.campus]);
+    saveAllSchedules(all);
+    setAllScheduleKeys(Object.keys(all));
+  }, [selectedCourses, courseColors, hydrated]);
 
   useEffect(() => {
     loadTerms();
@@ -462,25 +488,52 @@ function CoursePlanner() {
           {/* My Schedule List */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="font-bold text-wsu-crimson text-lg">My Schedule</h3>
+              <h3 className="font-bold text-wsu-crimson text-lg">
+                My Schedule
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  {filters.term} {filters.year}
+                </span>
+              </h3>
               <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-600">
                   <span className="font-bold text-wsu-crimson text-lg">{totalCredits}</span> credits
                 </span>
                 {selectedCourses.length > 0 && (
                   <button
-                    onClick={() => {
-                      if (window.confirm('Clear all courses from schedule?')) {
-                        setSelectedCourses([]);
-                      }
-                    }}
+                    onClick={() => setSelectedCourses([])}
                     className="text-xs text-red-600 hover:text-red-800"
                   >
-                    Clear All
+                    Clear
                   </button>
                 )}
               </div>
             </div>
+
+            {/* Saved semester chips */}
+            {allScheduleKeys.length > 1 && (
+              <div className="flex flex-wrap gap-1.5 mb-3 pb-3 border-b border-gray-100">
+                {allScheduleKeys
+                  .sort((a, b) => b.localeCompare(a))
+                  .map(k => {
+                    const [y, ...t] = k.split('_');
+                    const label = `${t.join(' ')} ${y}`;
+                    const isActive = k === activeTermKey.current;
+                    return (
+                      <button
+                        key={k}
+                        onClick={() => setFilters(f => ({ ...f, year: y, term: t.join('_') }))}
+                        className={`px-2 py-0.5 rounded text-xs font-medium transition ${
+                          isActive
+                            ? 'bg-wsu-crimson text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+              </div>
+            )}
 
             {selectedCourses.length === 0 ? (
               <div className="text-center text-gray-400 py-4">
