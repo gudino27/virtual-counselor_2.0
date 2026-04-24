@@ -22,9 +22,32 @@ TEST_CASES = ROOT / "data" / "domain" / "test_cases.json"
 RESULTS    = ROOT / "data" / "results" / "reranker_comparison.json"
 
 raw = json.loads(TEST_CASES.read_text())
-cases = (raw["cases"] if isinstance(raw, dict) else raw)[:40]
+cases = (raw["cases"] if isinstance(raw, dict) else raw)
 ground_truth = [tc["expected_answer"] for tc in cases]
 print(f"Loaded {len(cases)} test cases\n")
+
+# Build student context block from server if available (graceful fallback to empty)
+import subprocess
+student_block = ""
+try:
+    r = subprocess.run(
+        ["curl", "-s", "-X", "POST", "http://localhost:3008/api/parse-transcript",
+         "-F", "transcript=@" + str(ROOT.parent / "virtual-counselor/build/test_transcript.pdf")],
+        capture_output=True, text=True, timeout=15
+    )
+    transcript_data = json.loads(r.stdout)
+    completed = [c["name"] for c in transcript_data.get("courses", [])
+                 if c.get("grade") and c.get("grade") not in ["IP", "W", "I"]]
+    credits_done = sum(c.get("credits", 0) for c in transcript_data.get("courses", [])
+                       if c.get("grade") and c.get("grade") not in ["IP", "W", "I"])
+    if completed:
+        student_block = f"Student completed courses: {', '.join(completed)}\nCredits completed: {credits_done}\n"
+        print(f"Student context: {len(completed)} courses, {credits_done} credits\n")
+except Exception:
+    print("No transcript available — using pure RAG (fallback)\n")
+
+# Categories that benefit from student context — others use pure RAG
+CONTEXT_CATEGORIES = {"degree_progress", "ucore_planning"}
 
 client   = ClaudeClient(model="claude-haiku-4-5", api_key=os.getenv("ANTHROPIC_API_KEY"))
 retriever = CourseRetriever(index_dir=str(INDEX_DIR))
@@ -32,7 +55,9 @@ retriever = CourseRetriever(index_dir=str(INDEX_DIR))
 def run_eval(label: str, builder: ContextBuilder) -> dict:
     preds, t0 = [], time.time()
     for tc in cases:
-        prompt, _ = builder.build(tc["question"])
+        # Only inject student context for categories that need it (fallback: empty if no transcript)
+        ctx = student_block if student_block and tc.get("category") in CONTEXT_CATEGORIES else ""
+        prompt, _ = builder.build(tc["question"], base_prompt=ctx)
         preds.append(client.generate(prompt, temperature=0.0, max_tokens=400))
     elapsed = round(time.time() - t0, 1)
     acc = EvaluationMetrics.accuracy(preds, ground_truth)

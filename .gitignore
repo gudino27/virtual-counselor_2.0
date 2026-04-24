@@ -77,8 +77,9 @@ virtual-counselor/src/components/DegreePlanner.js.bak
 
 venv/
 *.backup
-SSR_TSRPT.pdf
 
 # Generated notebook outputs and test artifacts
 prompt-search/notebooks/evaluation/*_output.ipynb
 prompt-search/data/test_results/dryrun_*.json 
+SSR_TSRPT.pdf
+prompt-search/data/benchmarks/*

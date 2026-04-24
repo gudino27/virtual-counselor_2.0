@@ -1,0 +1,61 @@
+# Local LLM inference service — runs llama-cpp-python with optional CUDA
+# Build for CPU:  docker build -f Dockerfile.llm -t vc-llm .
+# Build for GPU:  docker build -f Dockerfile.llm --build-arg USE_CUDA=1 -t vc-llm .
+# Run with GPU:   docker run --gpus all -p 8080:8080 -v ./prompt-search/models:/models vc-llm
+
+ARG USE_CUDA=0
+
+# ── Base image: GPU path uses CUDA 12.4, CPU path uses slim Debian ──────────
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS base-gpu
+FROM python:3.11-slim AS base-cpu
+
+FROM base-cpu AS base-0
+FROM base-gpu AS base-1
+ARG USE_CUDA=0
+FROM base-${USE_CUDA} AS base
+
+# ── System deps ──────────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake git curl wget \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# ── Install llama-cpp-python (CUDA, Metal, or CPU) ───────────────────────────
+ARG USE_CUDA=0
+ARG USE_METAL=0
+RUN if [ "$USE_CUDA" = "1" ]; then \
+        CMAKE_ARGS="-DGGML_CUDA=on -DCUDA_ARCHITECTURES=52" \
+        pip install --no-cache-dir llama-cpp-python==0.3.20; \
+    elif [ "$USE_METAL" = "1" ]; then \
+        CMAKE_ARGS="-DGGML_METAL=on" \
+        pip install --no-cache-dir llama-cpp-python==0.3.20; \
+    else \
+        pip install --no-cache-dir llama-cpp-python==0.3.20; \
+    fi
+
+# ── App deps ─────────────────────────────────────────────────────────────────
+RUN pip install --no-cache-dir fastapi uvicorn python-dotenv pydantic
+
+# ── Copy inference server ─────────────────────────────────────────────────────
+COPY prompt-search/scripts/llm_server.py ./llm_server.py
+
+# Model is mounted at runtime — not baked into the image
+VOLUME ["/models"]
+
+# GPU layers env: 0 = CPU-only, positive = layers on GPU
+# For GTX 950 (2GB VRAM) with 3B model: GPU_LAYERS=32 (full GPU)
+# For GTX 950 (2GB VRAM) with 8B model: GPU_LAYERS=10 (partial)
+# For CPU-only: GPU_LAYERS=0
+ENV MODEL_PATH=/models/llama-3.2-3b-instruct-q4_k_m.gguf
+ENV GPU_LAYERS=0
+ENV N_CTX=2048
+ENV N_THREADS=4
+ENV PORT=8080
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -sf http://localhost:8080/health || exit 1
+
+CMD ["sh", "-c", "uvicorn llm_server:app --host 0.0.0.0 --port $PORT"]

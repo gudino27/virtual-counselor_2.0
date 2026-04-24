@@ -36,10 +36,15 @@ class BenchmarkLoader:
             with open(cache_path) as f:
                 return json.load(f)
 
-        ds = load_dataset("hendrycks/math", "all", split="test", trust_remote_code=True)
+        # Sample evenly across algebra, geometry, number_theory, counting_and_probability, precalculus
+        categories = ["algebra", "geometry", "number_theory", "counting_and_probability", "precalculus"]
+        per_cat = subset_size // len(categories)
         rng = random.Random(42)
-        indices = rng.sample(range(len(ds)), min(subset_size, len(ds)))
-        subset = [{"question": ds[i]["problem"], "answer": ds[i]["solution"]} for i in indices]
+        subset = []
+        for cat in categories:
+            ds = load_dataset("EleutherAI/hendrycks_math", cat, split="test")
+            indices = rng.sample(range(len(ds)), min(per_cat, len(ds)))
+            subset += [{"question": ds[i]["problem"], "answer": ds[i]["solution"], "category": cat} for i in indices]
 
         with open(cache_path, "w") as f:
             json.dump(subset, f, indent=2)
