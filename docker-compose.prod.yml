@@ -95,6 +95,7 @@ services:
       - PORT=8080
     volumes:
       - ./prompt-search/models:/models:ro
+      - ./prompt-search/data/domain:/app/data/domain:ro
     restart: unless-stopped
     networks:
       - vc-network

@@ -35,10 +35,13 @@ RUN if [ "$USE_CUDA" = "1" ]; then \
     fi
 
 # ── App deps ─────────────────────────────────────────────────────────────────
-RUN pip install --no-cache-dir fastapi uvicorn python-dotenv pydantic
+RUN pip install --no-cache-dir fastapi uvicorn python-dotenv pydantic \
+        numpy "sentence-transformers>=2.7,<3.0" "faiss-cpu>=1.11" rank_bm25 \
+        --extra-index-url https://download.pytorch.org/whl/cpu torch
 
-# ── Copy inference server ─────────────────────────────────────────────────────
+# ── Copy inference server and RAG source ─────────────────────────────────────
 COPY prompt-search/scripts/llm_server.py ./llm_server.py
+COPY prompt-search/src ./src
 
 # Model is mounted at runtime — not baked into the image
 VOLUME ["/models"]

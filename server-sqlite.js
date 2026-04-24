@@ -3390,8 +3390,30 @@ app.post('/api/llm-advice', llmRateLimiter, sanitizeLlmInput, async (req, res) =
         });
     }
     console.log(`[guardrail] Passed. Processing advising request...`);
+
+    // Route to local LLM container when enabled (falls back to notebook if unavailable)
+    if (process.env.LOCAL_MODEL_ENABLED === 'true') {
+      const localUrl = process.env.LOCAL_LLM_URL || 'http://localhost:8080';
+      try {
+        const fetch = (await import('node-fetch')).default;
+        const llmRes = await fetch(`${localUrl}/advise`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question, student_context: resolvedContext }),
+          signal: AbortSignal.timeout(60000),
+        });
+        if (llmRes.ok) {
+          const data = await llmRes.json();
+          return res.status(200).json({ answer: data.answer, sources: data.sources, metadata: { model: data.model, local: true } });
+        }
+        console.warn('[local-llm] Non-OK response, falling back to notebook');
+      } catch (localErr) {
+        console.warn('[local-llm] Unreachable, falling back to notebook:', localErr.message);
+      }
+    }
+
     const result = await executeNotebook(notebookPath, { question, student_context: resolvedContext, use_rag });
-    
+
     return res.status(200).json(result);
 
   } catch (error) {
