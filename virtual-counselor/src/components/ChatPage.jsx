@@ -33,19 +33,9 @@ export default function ChatPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const isAllowedTopic = (text) => {
-        const pattern = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite|take|register|enroll|graduate|semester|gpa|grade|meet|seat|open|section|offered|available|instructor|waitlist|when\s+is|what\s+time|[a-z]{2,6}(\s+[a-z]{1,2})?\s*\d{3}/i;
-        return pattern.test(text);
-    };
-
     const handleSend = async (e) => {
         if (e) e.preventDefault();
         if (!input.trim() || isLoading) return;
-
-        if (!isAllowedTopic(input)) {
-            setError("Please keep questions focused on WSU academic advising, courses, or degree planning.");
-            return;
-        }
 
         setError(null);
         setIsLoading(true);

@@ -11,12 +11,6 @@ export default function ChatWidget() {
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Client-side regex check
-    const isAllowedTopic = (text) => {
-        const pattern = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite|take|register|enroll|graduate|semester|gpa|grade|meet|seat|open|section|offered|available|instructor|waitlist|when\s+is|what\s+time|[a-z]{2,6}(\s+[a-z]{1,2})?\s*\d{3}/i;
-        return pattern.test(text);
-    };
-
     const handleSend = async (e) => {
         e.preventDefault();
 
@@ -26,11 +20,6 @@ export default function ChatWidget() {
         // Block prompt injection
         if (/(ignore previous|system prompt|jailbreak|bypass)/i.test(cleanInput)) {
             setError("Invalid request format.");
-            return;
-        }
-
-        if (!isAllowedTopic(input)) {
-            setError("Please keep questions focused on WSU academic advising.");
             return;
         }
 

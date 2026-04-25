@@ -3379,15 +3379,34 @@ app.post('/api/llm-advice', llmRateLimiter, sanitizeLlmInput, async (req, res) =
   try {
     const notebookPath = path.join(__dirname, 'notebooks', 'production', 'api_advice.ipynb');
 
-    // Fast regex guardrail — no LLM call needed for topic classification
-    const ALLOWED_TOPIC_RE = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite|take|register|enroll|graduat|semester|gpa|grade|catalog|requirement|curriculum|transfer|minor|certificate|meet|seat|open|section|offered|available|instructor|waitlist|when\s+is|what\s+time|[a-z]{2,6}(\s+[a-z]{1,2})?\s*\d{3}/i;
+    // Guardrail: check advising keywords OR match words against catalog_courses in DB
+    const ADVISING_RE = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite|take|register|enroll|graduat|semester|gpa|grade|catalog|requirement|curriculum|transfer|minor|certificate|waitlist|offered|instructor/i;
     console.log(`\n[guardrail] Running check...`);
-    if (!ALLOWED_TOPIC_RE.test(question)) {
-        console.log(`[guardrail] Blocked off-topic question: "${question}"`);
-        return res.status(400).json({
-            error: "off_topic",
-            message: "I can only answer questions related to WSU academic advising, courses, or degree planning."
+    let guardrailPassed = ADVISING_RE.test(question);
+    if (!guardrailPassed) {
+      // Extract meaningful words (3+ chars, skip stop words)
+      const STOP_WORDS = new Set(['what','how','when','where','which','who','does','have','need','want','will','can','the','for','and','are','was','this','that','with','from','its','not','but','about','into','than','then','them','they','also','been','were','would','could','should','your','their','there','here','some','more','much','many','like','just','get','got','let','did','do','is','in','it','of','to','a','i','me','my','us','we','or','at','an','as','be','by','on','if','so','up','no','go']);
+      const words = question.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+        .filter(w => w.length >= 3 && !STOP_WORDS.has(w))
+        .slice(0, 10);
+      if (words.length > 0) {
+        const clauses = words.map(() => `LOWER(title) LIKE ? OR LOWER(code) LIKE ?`).join(' OR ');
+        const params = words.flatMap(w => [`%${w}%`, `%${w}%`]);
+        const hit = await new Promise((resolve) => {
+          db.get(`SELECT 1 FROM catalog_courses WHERE ${clauses} LIMIT 1`, params, (err, row) => {
+            if (err) { console.warn('[guardrail] DB error, failing open:', err.message); resolve(true); }
+            else resolve(!!row);
+          });
         });
+        guardrailPassed = hit;
+      }
+    }
+    if (!guardrailPassed) {
+      console.log(`[guardrail] Blocked off-topic question: "${question}"`);
+      return res.status(400).json({
+        error: "off_topic",
+        message: "I can only answer questions related to WSU academic advising, courses, or degree planning."
+      });
     }
     console.log(`[guardrail] Passed. Processing advising request...`);
 
