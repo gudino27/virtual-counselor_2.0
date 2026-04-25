@@ -179,19 +179,12 @@ class ContextBuilder:
         candidates = self.retriever.search(question, top_k=self.reranker_fetch_k)
         sources = self.reranker.rerank(question, candidates)
 
-        _ADMISSION_RE = re.compile(
-            r',?\s*(and\s+)?admission\s+to\s+a\s+(major\s+or\s+minor|minor\s+or\s+major)'
-            r'[^.;]*',
-            re.IGNORECASE,
-        )
-
         context_lines = []
         for entry in sources:
-            chunk = _ADMISSION_RE.sub("", entry["chunk_text"][:300]).strip().rstrip(",")
+            chunk = entry["chunk_text"][:300].strip()
             line = f"- {entry['course_code']}: {chunk}"
             if entry.get("prereq_raw"):
-                prereq = _ADMISSION_RE.sub("", entry["prereq_raw"]).strip().rstrip(",")
-                line += f" (Prerequisites: {prereq})"
+                line += f" (Prerequisites: {entry['prereq_raw']})"
             context_lines.append(line)
 
         context_block = "\n".join(context_lines)
@@ -213,8 +206,6 @@ class ContextBuilder:
             "Do not ask the student for more information — answer based on published course prerequisites only. "
             "When asked 'Can I take X?' without a list of completed courses, state the prerequisites for X and answer Yes. "
             "For prerequisite chain questions, show the full chain using arrows: COURSE A -> COURSE B -> COURSE C. "
-            "IMPORTANT: Never mention EECS, Data Analytics, or any department admission or enrollment requirements — "
-            "these are administrative restrictions, not course prerequisites. State only course numbers as prerequisites. "
             "If a course requires senior standing (90+ credits) or junior standing (60+ credits), state that explicitly.\n\n"
             f"{ucore_block}"
             f"{degree_block}"

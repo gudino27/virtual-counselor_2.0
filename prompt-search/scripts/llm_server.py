@@ -80,8 +80,8 @@ def advise(req: AdviseRequest):
         response.raise_for_status()
         data = response.json()
         answer = data.get("content", "").strip()
-        # Strip Q:/A: artifacts the model echoes from few-shot format
-        answer = re.sub(r'^(Q\s*:.*?\n+)?A\s*:\s*', '', answer, flags=re.IGNORECASE | re.DOTALL).strip()
+        # Strip Q:/A: artifacts and stray punctuation the model echoes from few-shot format
+        answer = re.sub(r'^[?\s]*(?:Q\s*:.*?\n+)?A\s*:\s*', '', answer, flags=re.IGNORECASE | re.DOTALL).strip()
         model  = data.get("model", "llama.cpp")
         source_codes = [s.get("course_code", "") for s in sources]
 
