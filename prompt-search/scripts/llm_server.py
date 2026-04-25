@@ -73,7 +73,7 @@ def advise(req: AdviseRequest):
         # Call llama.cpp server
         response = httpx.post(
             f"{LLAMACPP_URL}/completion",
-            json={"prompt": prompt, "n_predict": req.max_tokens, "temperature": 0.0,
+            json={"prompt": prompt, "n_predict": min(req.max_tokens, 300), "temperature": 0.0,
                   "stop": ["</s>", "\n\nQuestion:", "###"]},
             timeout=60.0,
         )
