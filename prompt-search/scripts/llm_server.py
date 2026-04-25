@@ -2,7 +2,7 @@
 FastAPI RAG wrapper — retrieves context then calls llama.cpp server for inference.
 Express backend calls /advise; this service calls ghcr.io/ggml-org/llama.cpp:server-cuda.
 """
-import os, sys
+import os, sys, re
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
@@ -28,7 +28,7 @@ def get_builder():
     if _builder is None:
         from retrieval.retriever import CourseRetriever
         from retrieval.context_builder import ContextBuilder
-        _builder = ContextBuilder(CourseRetriever(index_dir=INDEX_DIR), top_k=3)
+        _builder = ContextBuilder(CourseRetriever(index_dir=INDEX_DIR), top_k=3, few_shot_n=2)
     return _builder
 
 
@@ -80,6 +80,8 @@ def advise(req: AdviseRequest):
         response.raise_for_status()
         data = response.json()
         answer = data.get("content", "").strip()
+        # Strip Q:/A: artifacts the model echoes from few-shot format
+        answer = re.sub(r'^(Q\s*:.*?\n+)?A\s*:\s*', '', answer, flags=re.IGNORECASE | re.DOTALL).strip()
         model  = data.get("model", "llama.cpp")
         source_codes = [s.get("course_code", "") for s in sources]
 
