@@ -2,7 +2,7 @@
 FastAPI RAG wrapper — retrieves context then calls llama.cpp server for inference.
 Express backend calls /advise; this service calls ghcr.io/ggml-org/llama.cpp:server-cuda.
 """
-import os, sys, re
+import os, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
@@ -68,20 +68,25 @@ def advise(req: AdviseRequest):
                 student_block += f"Student major: {major}\n"
 
         builder = get_builder()
-        prompt, sources = builder.build(req.question, base_prompt=student_block)
+        system_prompt, sources = builder.build(req.question, base_prompt=student_block)
 
-        # Call llama.cpp server
+        # Use chat completions endpoint so the instruct model applies its template correctly
         response = httpx.post(
-            f"{LLAMACPP_URL}/completion",
-            json={"prompt": prompt, "n_predict": min(req.max_tokens, 300), "temperature": 0.0,
-                  "stop": ["</s>", "\n\nQuestion:", "###"]},
+            f"{LLAMACPP_URL}/v1/chat/completions",
+            json={
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": req.question},
+                ],
+                "max_tokens": min(req.max_tokens, 300),
+                "temperature": 0.0,
+                "stop": ["###"],
+            },
             timeout=60.0,
         )
         response.raise_for_status()
         data = response.json()
-        answer = data.get("content", "").strip()
-        # Strip Q:/A: artifacts and stray punctuation the model echoes from few-shot format
-        answer = re.sub(r'^[?\s]*(?:Q\s*:.*?\n+)?A\s*:\s*', '', answer, flags=re.IGNORECASE | re.DOTALL).strip()
+        answer = data["choices"][0]["message"]["content"].strip()
         model  = data.get("model", "llama.cpp")
         source_codes = [s.get("course_code", "") for s in sources]
 
