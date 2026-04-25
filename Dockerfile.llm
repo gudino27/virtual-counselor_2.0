@@ -6,7 +6,7 @@
 ARG USE_CUDA=0
 
 # ── Base image: GPU path uses CUDA 12.4, CPU path uses slim Debian ──────────
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS base-gpu
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS base-gpu
 FROM python:3.11-slim AS base-cpu
 
 FROM base-cpu AS base-0
@@ -38,9 +38,12 @@ RUN if [ "$USE_CUDA" = "1" ]; then \
     fi
 
 # ── App deps ─────────────────────────────────────────────────────────────────
-RUN pip install --no-cache-dir fastapi uvicorn python-dotenv pydantic \
-        numpy "sentence-transformers>=2.7,<3.0" "faiss-cpu>=1.11" rank_bm25 \
-        --extra-index-url https://download.pytorch.org/whl/cpu torch
+RUN pip install --no-cache-dir \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        torch numpy
+RUN pip install --no-cache-dir \
+        fastapi uvicorn python-dotenv pydantic \
+        "sentence-transformers>=2.7,<3.0" "faiss-cpu>=1.11" rank_bm25
 
 # ── Copy inference server and RAG source ─────────────────────────────────────
 COPY prompt-search/scripts/llm_server.py ./llm_server.py
@@ -61,7 +64,7 @@ ENV PORT=8080
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -sf http://localhost:8080/health || exit 1
 
 CMD ["sh", "-c", "uvicorn llm_server:app --host 0.0.0.0 --port $PORT"]

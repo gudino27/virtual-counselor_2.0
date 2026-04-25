@@ -4,7 +4,7 @@ Used by Express backend as a drop-in for Claude when LOCAL_MODEL_ENABLED=true.
 """
 import os, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
