@@ -75,27 +75,20 @@ services:
     networks:
       - vc-network
 
-  # Local LLM inference — optional, set LOCAL_MODEL_ENABLED=true in .env.production
-  # GTX 950 (2GB VRAM): runs Llama 3.2 3B fully on GPU
-  llm:
-    build:
-      context: .
-      dockerfile: Dockerfile.llm
-      args:
-        USE_CUDA: "1"
-    container_name: virtual-counselor-llm
+  # llama.cpp inference server — official pre-built CUDA image, no compilation
+  # GTX 950 (2GB VRAM): runs Llama 3.2 3B fully on GPU (sm_52 supported)
+  llamacpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: virtual-counselor-llamacpp
     runtime: nvidia
-    ports:
-      - "8080:8080"
     environment:
-      - MODEL_PATH=/models/llama-3.2-3b-instruct-q4_k_m.gguf
-      - GPU_LAYERS=28
-      - N_CTX=2048
-      - N_THREADS=4
-      - PORT=8080
+      - LLAMA_ARG_MODEL=/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+      - LLAMA_ARG_N_GPU_LAYERS=28
+      - LLAMA_ARG_CTX_SIZE=2048
+      - LLAMA_ARG_HOST=0.0.0.0
+      - LLAMA_ARG_PORT=8081
     volumes:
       - ./prompt-search/models:/models:ro
-      - ./prompt-search/data/domain:/app/data/domain:ro
     restart: unless-stopped
     networks:
       - vc-network
@@ -106,6 +99,28 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    profiles:
+      - local-llm
+
+  # RAG wrapper — does retrieval then calls llamacpp for inference
+  llm:
+    build:
+      context: .
+      dockerfile: Dockerfile.llm
+    container_name: virtual-counselor-llm
+    ports:
+      - "8080:8080"
+    environment:
+      - LLAMACPP_URL=http://llamacpp:8081
+      - INDEX_DIR=/app/data/domain
+      - PORT=8080
+    volumes:
+      - ./prompt-search/data/domain:/app/data/domain:ro
+    depends_on:
+      - llamacpp
+    restart: unless-stopped
+    networks:
+      - vc-network
     profiles:
       - local-llm
 
