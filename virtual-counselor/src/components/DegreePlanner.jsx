@@ -899,7 +899,7 @@ function DegreePlanner() {
     try {
       const formData = new FormData();
       formData.append('transcript', file);
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3008';
+      const apiBase = import.meta.env.VITE_API_URL ?? '';
       const res = await fetch(`${apiBase}/api/parse-transcript`, { method: 'POST', body: formData });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
