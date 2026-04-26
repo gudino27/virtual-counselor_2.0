@@ -1,5 +1,5 @@
 // API client for backend communication
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.virtual-counselor.org';
+const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 // Helper function for fetch requests
 async function fetchJSON(endpoint, options = {}) {
