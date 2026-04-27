@@ -94,8 +94,10 @@ class CatalogIngestor:
         texts = [c["chunk_text"] for c in chunks]
         embeddings = self.model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
         embeddings = embeddings.astype(np.float32)
+        # L2-normalize so inner-product search equals cosine similarity
+        faiss.normalize_L2(embeddings)
 
-        index = faiss.IndexFlatL2(embeddings.shape[1])
+        index = faiss.IndexFlatIP(embeddings.shape[1])
         index.add(embeddings)
         return index, chunks
 

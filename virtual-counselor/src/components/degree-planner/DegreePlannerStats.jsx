@@ -11,15 +11,19 @@ export default function DegreePlannerStats({
   belowMinGradeCount = 0,
   degreeMinGrade = null,
   graduationProjection = null,
+  dismissedGraduationBanner = false,
+  onDismissGraduationBanner = () => {},
+  dismissedGradeBanner = false,
+  onDismissGradeBanner = () => {},
 }) {
   return (
     <div className="space-y-2">
-    {graduationProjection && graduationProjection.semestersLeft > 0 && creditsRequired > 0 && (
-      <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
-        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    {!dismissedGraduationBanner && graduationProjection && graduationProjection.semestersLeft > 0 && creditsRequired > 0 && (
+      <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
+        <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-        <span>
+        <span className="flex-1">
           <strong>{Math.max(creditsRequired - creditsAchieved, 0)} credits remaining</strong>
           {' '}— at your average of <strong>~{graduationProjection.avgPerSemester} credits/semester</strong> you have approximately{' '}
           <strong>{graduationProjection.semestersLeft} more semester{graduationProjection.semestersLeft !== 1 ? 's' : ''}</strong>
@@ -30,16 +34,26 @@ export default function DegreePlannerStats({
             </span>
           )}
         </span>
+        <button onClick={onDismissGraduationBanner} className="flex-shrink-0 text-blue-400 hover:text-blue-700" aria-label="Dismiss">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
     )}
-    {belowMinGradeCount > 0 && degreeMinGrade && (
-      <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-300 rounded-md text-sm text-amber-800">
-        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    {!dismissedGradeBanner && belowMinGradeCount > 0 && degreeMinGrade && (
+      <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-300 rounded-md text-sm text-amber-800">
+        <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
         </svg>
-        <span>
+        <span className="flex-1">
           <strong>{belowMinGradeCount} course{belowMinGradeCount > 1 ? 's' : ''}</strong> matched your plan but received below the <strong>{degreeMinGrade}</strong> minimum required for your degree — they may not count toward the major.
         </span>
+        <button onClick={onDismissGradeBanner} className="flex-shrink-0 text-amber-400 hover:text-amber-700" aria-label="Dismiss">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
     )}
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">

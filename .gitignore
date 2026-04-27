@@ -83,3 +83,7 @@ prompt-search/notebooks/evaluation/*_output.ipynb
 prompt-search/data/test_results/dryrun_*.json 
 SSR_TSRPT.pdf
 prompt-search/data/benchmarks/*
+prompt-search/writeup/
+
+# FAISS index (regenerate with prompt-search/scripts/build_index.py)
+*.faiss

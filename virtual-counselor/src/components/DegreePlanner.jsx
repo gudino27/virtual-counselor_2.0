@@ -90,6 +90,12 @@ function DegreePlanner() {
   const [catalogTargetCourse, setCatalogTargetCourse] = useState(null);
 
   const [hydrated, setHydrated] = useState(false);
+  const [dismissedGraduationBanner, setDismissedGraduationBanner] = useState(
+    () => localStorage.getItem('vc_dismiss_graduation_banner') === 'true'
+  );
+  const [dismissedGradeBanner, setDismissedGradeBanner] = useState(
+    () => localStorage.getItem('vc_dismiss_grade_banner') === 'true'
+  );
 
   // Initialize degree plan structure
   useEffect(() => {
@@ -485,17 +491,16 @@ function DegreePlanner() {
       return;
     }
 
-    const newYears = years
-      .filter((y) => y.id !== yearId)
-      .map((y, idx) => ({ id: idx + 1, name: `Year ${idx + 1}` }));
+    const remainingYears = years.filter((y) => y.id !== yearId);
+    const newYears = remainingYears.map((y, idx) => ({ ...y, id: idx + 1, name: `Year ${idx + 1}` }));
 
     setYears(newYears);
 
     const newPlan = {};
-    newYears.forEach((year, idx) => {
-      const oldYearData = Object.values(degreePlan)[idx];
+    remainingYears.forEach((oldYear, idx) => {
+      const oldYearData = degreePlan[oldYear.id];
       if (oldYearData) {
-        newPlan[year.id] = oldYearData;
+        newPlan[idx + 1] = oldYearData;
       }
     });
     setDegreePlan(newPlan);
@@ -1209,6 +1214,10 @@ function DegreePlanner() {
         belowMinGradeCount={progressAnalysis.belowMinGradeCount || 0}
         degreeMinGrade={degreeMinGrade}
         graduationProjection={graduationProjection}
+        dismissedGraduationBanner={dismissedGraduationBanner}
+        onDismissGraduationBanner={() => { localStorage.setItem('vc_dismiss_graduation_banner', 'true'); setDismissedGraduationBanner(true); }}
+        dismissedGradeBanner={dismissedGradeBanner}
+        onDismissGradeBanner={() => { localStorage.setItem('vc_dismiss_grade_banner', 'true'); setDismissedGradeBanner(true); }}
       />
 
       {/* Degree Progress Bar */}

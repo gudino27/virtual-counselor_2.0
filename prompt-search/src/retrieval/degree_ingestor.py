@@ -12,6 +12,99 @@ _CREDITS_RE = re.compile(r'^\((\d{2,3}) CREDITS\)$')
 # Matches course codes like "CPT S 121", "MATH 171", "E E 214", "HISTORY 105"
 _COURSE_CODE_RE = re.compile(r'\b([A-Z][A-Z &/]{1,8}\s+\d{3,4})\b')
 
+# English connector words that regex above falsely matches as course prefixes
+# when they appear before numbers (e.g., "OR 107", "AND 171", "IN MATH 171",
+# "OF 120 CREDITS"). Filter these out.
+_CONNECTOR_STOPWORDS = {
+    "OR", "AND", "THE", "OF", "AT", "IN", "BY", "TO", "WITH", "A", "AN",
+    "IF", "FOR", "FROM", "AS", "ON", "UP", "BE", "IS", "ARE", "NOT",
+    "MAY", "CAN", "EACH", "ALSO", "ONE", "TWO", "ANY", "ALL", "BOTH",
+    "HIGHER", "LOWER", "ABOVE", "BELOW", "ABOUT", "THIS", "THESE",
+    "THAT", "THOSE", "SOME", "MOST", "SUCH", "VIA", "PER", "NEW", "OLD",
+    "PASS", "TAKE", "HAVE", "HAD", "HAS", "WAS", "WILL", "SHALL", "WOULD",
+    "SHOULD", "COULD", "ALEKS", "SAT", "AP", "BS", "BA", "GPA",
+    "REACH", "SCORE", "GRADE", "YEAR", "TERM", "CREDIT", "CREDITS",
+    "FALL", "SPRING", "SUMMER", "WINTER", "FIRST", "SECOND", "THIRD",
+    "FOURTH", "FIFTH", "AFTER", "BEFORE", "WHEN", "WHILE", "PLUS",
+    "MINUS", "ENGR",  # ENGR alone with a number can appear but is rarely a course — keep as a stopword unless followed by "489" style?
+}
+# Carve out ENGR since "ENGR 489" is a real course at WSU
+_CONNECTOR_STOPWORDS.discard("ENGR")
+
+# Known real WSU course prefixes. Any PREFIX NUM where PREFIX is in this
+# set is definitely a course. Outside the set we fall back to the stopword
+# filter.
+_KNOWN_REAL_PREFIXES = {
+    "CPT S", "CPTS", "MATH", "STAT", "PHYSICS", "PHYS", "CHEM", "BIOLOGY",
+    "BIO", "ENGL", "HIST", "HISTORY", "COM", "COMSTM", "EE", "E E", "MECH",
+    "M E", "ME", "CE", "C E", "BE", "B E", "BIOENG", "BEE", "SOC", "SOCS",
+    "PSYCH", "PSYC", "ECON", "ECONS", "MUS", "MUSIC", "ART", "ENGR",
+    "UCORE", "SPAN", "FR", "GER", "CHIN", "JAPN", "NUTR", "KINES",
+    "HBM", "MGMT", "MKTG", "FIN", "ACCTG", "PHIL", "POL S", "POLS",
+    "ANTH", "ANTHRO", "GEOL", "GEOG", "ASTR", "HORT", "AFS", "ANSC",
+    "MBIOS", "ARCH", "DTC", "CDS", "NEUR", "NURS", "AMDT", "AAS",
+    "HD", "HDFS", "CES", "PHARM", "ENGLISH",
+}
+
+
+_LINE_FULL_RE = re.compile(r"\b([A-Z][A-Z &/]{1,8})\s+(\d{3,4})\b")
+_LINE_NUM_RE = re.compile(r"\b(\d{3,4})\b")
+
+
+def _extract_line_codes(text: str) -> set:
+    """Extract valid course codes from a single schedule line, expanding
+    continuation numbers ("CPT S 121 or 131" -> both codes)."""
+    codes = set()
+    current_prefix = None
+    pos = 0
+    while pos < len(text):
+        m_full = _LINE_FULL_RE.search(text, pos)
+        m_num = _LINE_NUM_RE.search(text, pos)
+
+        next_full_start = m_full.start() if m_full else len(text) + 1
+        next_num_start = m_num.start() if m_num else len(text) + 1
+
+        if next_full_start <= next_num_start and m_full is not None:
+            prefix = m_full.group(1).strip()
+            num = m_full.group(2)
+            code = f"{prefix} {num}"
+            if _is_real_course_code(code):
+                current_prefix = prefix
+                codes.add(code)
+            else:
+                current_prefix = None
+            pos = m_full.end()
+        elif m_num is not None:
+            num = m_num.group(1)
+            # Expand continuations only for 3-4 digit numbers that look
+            # like course numbers (100-999 typical range), and only if we
+            # have a current prefix established on this line.
+            if current_prefix and 100 <= int(num) <= 999:
+                candidate = f"{current_prefix} {num}"
+                if _is_real_course_code(candidate):
+                    codes.add(candidate)
+            pos = m_num.end()
+        else:
+            break
+    return codes
+
+
+def _is_real_course_code(code: str) -> bool:
+    """Return True if the matched code looks like a real WSU course."""
+    parts = code.strip().split()
+    if len(parts) < 2:
+        return False
+    prefix = " ".join(parts[:-1]).upper()
+    if prefix in _CONNECTOR_STOPWORDS:
+        return False
+    if prefix in _KNOWN_REAL_PREFIXES:
+        return True
+    # Unknown prefix: allow if it's plausibly a department code (2-8 letters,
+    # not a connector).
+    if re.fullmatch(r"[A-Z]{2,8}(?: [A-Z])?", prefix):
+        return True
+    return False
+
 # Year/term structural lines to skip when extracting course codes
 _STRUCTURAL_RE = re.compile(
     r'^(First|Second|Third|Fourth) (Year|Term)|^(First|Second) Term Credits'
@@ -47,17 +140,18 @@ def _extract_required_courses(block_lines: list) -> list:
     for line in block_lines:
         stripped = line.strip()
 
-        # Footnotes begin with a standalone digit line followed by text
-        if re.match(r'^\d\s*$', stripped) or re.match(r'^\d\s+[A-Z]', stripped):
+        # Footnotes are separated from the schedule by a long underscore line
+        # like "_______". Bare digit lines inside the schedule are NOT
+        # footnote markers — they are credit-hour indicators ("3", "4") or
+        # footnote-reference markers that appear directly under course rows.
+        if re.match(r'^_{3,}$', stripped):
             in_footnote = True
 
+        codes_on_line = _extract_line_codes(stripped.upper())
         if in_footnote:
-            for m in _COURSE_CODE_RE.finditer(stripped.upper()):
-                footnote_codes.add(m.group(1).strip())
-        else:
-            if not _STRUCTURAL_RE.match(stripped):
-                for m in _COURSE_CODE_RE.finditer(stripped.upper()):
-                    schedule_codes.add(m.group(1).strip())
+            footnote_codes.update(codes_on_line)
+        elif not _STRUCTURAL_RE.match(stripped):
+            schedule_codes.update(codes_on_line)
 
     # Required = appeared in schedule but not exclusively in elective footnotes
     required = sorted(schedule_codes - footnote_codes)

@@ -15,12 +15,29 @@ from counselor.prereq_checker import PrereqChecker
 from counselor.grad_advisor import GradAdvisor
 
 
+_UCORE_REFERENCE = (
+    "WSU UCORE Designation Reference (canonical — treat as authoritative):\n"
+    "- WRTG (Writing): ENGL 101 is the standard first-year composition course fulfilling WRTG.\n"
+    "- COMM (Communication): COM 102 or equivalent public-speaking course.\n"
+    "- QUAN (Quantitative Reasoning): MATH 105, 106, 107, 108, 171, or higher.\n"
+    "- BSCI (Biological Sciences), PSCI (Physical Sciences): lab-science courses.\n"
+    "- SSCI (Social Sciences), HUM (Humanities), ARTS (Arts), DIVR (Diversity),\n"
+    "  EQJS (Equity & Justice): inquiry designations; students complete multiple.\n"
+    "- ROOT: HISTORY 105 is the standard ROOT of Contemporary Issues course.\n"
+    "- CAPS (Capstone): upper-division integrative course (e.g., CPTS 483 for CS).\n"
+    "- [M] Writing-in-the-Major: ENGL 402 is a common writing-in-the-major course.\n"
+    "When a student's question involves UCORE categories, map category tags in the "
+    "catalog (shown in brackets like [WRTG], [ARTS]) to the above designations.\n"
+)
+
+
 def _build_template(context_chunks: list) -> PromptTemplate:
     context = "\n\n---\n\n".join(c["chunk_text"] for c in context_chunks)
     template = PromptTemplate(
         task_description=(
             f"Use the following WSU course catalog information to answer the student's question.\n\n"
-            f"Catalog context:\n{context}"
+            f"Catalog context:\n{context}\n\n"
+            f"{_UCORE_REFERENCE}"
         )
     )
     template = PromptMutator.add_domain_context(template, "course_planning")
@@ -63,11 +80,20 @@ class VirtualCounselorPipeline:
         if isinstance(course_codes, str):
             course_codes = [course_codes]
 
-        # Run the deterministic checker and retrieve catalog context for each course
+        # Run the deterministic checker and retrieve catalog context for each course.
+        # For multi-course requests (e.g. schedule feasibility), every OTHER course
+        # in the same request counts as a concurrent-enrollment candidate — which
+        # only satisfies prereqs whose raw text explicitly allows concurrent
+        # enrollment (handled inside PrereqChecker.check).
         check_results = []
         context_chunks = []
         for code in course_codes:
-            result = self.checker.check(code, completed_courses)
+            concurrent_others = [c for c in course_codes if c != code]
+            result = self.checker.check(
+                code,
+                completed_courses,
+                concurrent_courses=concurrent_others,
+            )
             check_results.append((code, result))
             entry = self.retriever.get_by_code(code)
             if entry:
@@ -101,7 +127,8 @@ class VirtualCounselorPipeline:
                 f"Catalog context:\n{catalog_context}\n\n"
                 f"Verified prerequisite check results (treat these as facts — do not contradict them):\n"
                 + "\n".join(structured_lines) + "\n\n"
-                + student_context
+                + student_context + "\n\n"
+                + _UCORE_REFERENCE
             )
         )
         template = PromptMutator.add_domain_context(template, "course_planning")
@@ -144,7 +171,8 @@ class VirtualCounselorPipeline:
                 f"Degree requirements from the catalog:\n{catalog_context}\n\n"
                 f"Verified progress summary (treat these as facts — do not contradict them):\n"
                 f"{structured_summary}\n\n"
-                f"{student_context}"
+                f"{student_context}\n\n"
+                f"{_UCORE_REFERENCE}"
             )
         )
         template = PromptMutator.add_domain_context(template, "course_planning")

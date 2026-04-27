@@ -48,29 +48,47 @@ class LocalLlamaClient:
         if os.environ.get("FORCE_CPU", "0") == "1":
             return 0
 
+        # Apple Silicon Metal — offload all layers
+        try:
+            import platform
+            if platform.system() == "Darwin" and platform.machine() == "arm64":
+                return -1  # -1 = all layers on Metal
+        except Exception:
+            pass
+
+        # CUDA (Nvidia)
         try:
             import torch
+            if torch.cuda.is_available():
+                vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+                if vram_gb >= 6:
+                    return 35
         except ImportError:
-            return 0
+            pass
 
-        if not torch.cuda.is_available():
-            return 0
-
-        vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
-
-        # RTX 3070 Mobile (8GB+): offload 35 of 40 layers to GPU
-        # GTX 950 (2GB) and below: CPU-only
-        if vram_gb >= 6:
-            return 35
         return 0
 
     def generate(self, prompt: str, temperature: float = 0.7, max_tokens: int = 500) -> str:
-        output = self._llm(
-            prompt,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            stop=self._stop_sequences,
-        )
+        # Reset KV cache before each call so questions are fully independent
+        self._llm.reset()
+        try:
+            output = self._llm(
+                prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stop=self._stop_sequences,
+            )
+        except Exception:
+            # If prompt exceeds context, truncate and retry
+            words = prompt.split()
+            truncated = " ".join(words[:int(len(words) * 0.75)])
+            self._llm.reset()
+            output = self._llm(
+                truncated,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stop=self._stop_sequences,
+            )
         self._total_tokens += output["usage"]["total_tokens"]
         return output["choices"][0]["text"]
 
