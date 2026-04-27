@@ -17,7 +17,7 @@
   "author": "Virtual Counselor Team",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.54.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@domattheshack/rate-my-professors": "^2.2.1",
     "axios": "^1.15.2",
     "cors": "^2.8.6",
