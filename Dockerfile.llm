@@ -1,6 +1,6 @@
 # RAG wrapper service — FastAPI + retrieval pipeline
 # Calls ghcr.io/ggml-org/llama.cpp:server-cuda for inference (no compilation needed)
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
