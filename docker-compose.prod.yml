@@ -124,7 +124,7 @@ services:
       - INDEX_DIR=/app/data/domain
       - PORT=8080
     volumes:
-      - ./prompt-search/data/domain:/app/data/domain:ro
+      - ./prompt-search/data/domain:/app/data/domain
     depends_on:
       - llamacpp
     restart: unless-stopped

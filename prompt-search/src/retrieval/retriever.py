@@ -78,8 +78,20 @@ def _build_index(index_dir: str) -> None:
     """Build courses.faiss from scratch if it is missing."""
     import subprocess
     import sys
-    scripts_dir = os.path.join(os.path.dirname(__file__), "..", "..", "scripts")
-    build_script = os.path.abspath(os.path.join(scripts_dir, "build_index.py"))
+    # Try relative to this file first, then common Docker app root locations
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "build_index.py"),
+        "/app/prompt-search/scripts/build_index.py",
+        "/app/scripts/build_index.py",
+    ]
+    build_script = None
+    for c in candidates:
+        p = os.path.abspath(c)
+        if os.path.exists(p):
+            build_script = p
+            break
+    if build_script is None:
+        raise FileNotFoundError(f"build_index.py not found in any of: {candidates}")
     print(f"[retriever] courses.faiss not found — building index from {build_script} ...")
     subprocess.run([sys.executable, build_script], check=True)
     print("[retriever] Index build complete.")
