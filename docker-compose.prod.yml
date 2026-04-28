@@ -89,6 +89,12 @@ services:
       - LLAMA_ARG_UBATCH_SIZE=128
       - LLAMA_ARG_HOST=0.0.0.0
       - LLAMA_ARG_PORT=8081
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     volumes:
       - ./prompt-search/models:/models:ro
     restart: unless-stopped
