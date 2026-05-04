@@ -19,7 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
     "@domattheshack/rate-my-professors": "^2.2.1",
-    "axios": "^1.15.2",
+    "axios": "^1.16.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
