@@ -15,10 +15,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         "sentence-transformers>=2.7,<3.0" "faiss-cpu>=1.11" rank_bm25
 
 COPY prompt-search/scripts/llm_server.py ./llm_server.py
+COPY prompt-search/scripts/build_index.py ./scripts/build_index.py
 COPY prompt-search/src ./src
+COPY pdf-archieved-catalog ./pdf-archieved-catalog
 
 ENV LLAMACPP_URL=http://llamacpp:8081
 ENV INDEX_DIR=/app/data/domain
+ENV CATALOG_PATH=/app/pdf-archieved-catalog/2024.txt
 ENV PORT=8080
 
 EXPOSE 8080

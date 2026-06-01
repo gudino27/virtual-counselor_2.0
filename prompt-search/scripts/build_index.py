@@ -11,8 +11,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from retrieval.ingestor import CatalogIngestor
 from retrieval.degree_ingestor import parse_degree_chunks
 
-CATALOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "pdf-archieved-catalog", "2024.txt")
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "domain")
+_default_catalog = os.path.join(os.path.dirname(__file__), "..", "..", "pdf-archieved-catalog", "2024.txt")
+_default_output = os.path.join(os.path.dirname(__file__), "..", "data", "domain")
+CATALOG_PATH = os.environ.get("CATALOG_PATH", _default_catalog)
+OUTPUT_DIR = os.environ.get("INDEX_DIR", _default_output)
 
 if __name__ == "__main__":
     catalog_path = os.path.abspath(CATALOG_PATH)
